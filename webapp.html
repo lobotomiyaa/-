@@ -246,14 +246,73 @@
     tg.expand();
 
 
-    function buy(days) {
+    async function buy(days) {
+
+    try {
+
+        const response = await fetch("/create-invoice", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                tariff: String(days)
+            })
+
+        });
+
+        const data = await response.json();
+
+        if (!data.ok) {
+
+            tg.showAlert(
+                "Ошибка: " + data.error
+            );
+
+            return;
+        }
+
+        tg.openInvoice(
+            data.invoice,
+            function(status) {
+
+                if (status === "paid") {
+
+                    tg.showAlert(
+                        "🎉 Оплата прошла успешно!"
+                    );
+
+                } else if (status === "cancelled") {
+
+                    tg.showAlert(
+                        "Оплата отменена."
+                    );
+
+                } else if (status === "failed") {
+
+                    tg.showAlert(
+                        "Оплата не прошла."
+                    );
+
+                }
+
+            }
+        );
+
+    } catch (error) {
 
         tg.showAlert(
-            "Вы выбрали тариф на " +
-            days +
-            " дней.\n\n" +
-            "Сейчас подключаем оплату."
+            "Не удалось создать счёт."
         );
+
+        console.error(error);
+
+    }
+
+    }
 
     }
 

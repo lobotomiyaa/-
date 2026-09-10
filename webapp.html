@@ -5,7 +5,7 @@
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     >
 
     <title>ОтвалиVPN</title>
@@ -15,25 +15,26 @@
     <style>
         * {
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             margin: 0;
             background: #090909;
-            color: white;
+            color: #ffffff;
             font-family: Arial, sans-serif;
         }
 
         .container {
             max-width: 520px;
-            margin: auto;
+            margin: 0 auto;
             padding: 24px 18px 40px;
         }
 
         .logo {
             text-align: center;
-            font-size: 52px;
-            margin-top: 10px;
+            font-size: 54px;
+            margin-top: 5px;
         }
 
         h1 {
@@ -44,13 +45,13 @@
 
         .subtitle {
             text-align: center;
-            color: #8d8d8d;
-            margin-bottom: 28px;
+            color: #888888;
+            margin-bottom: 25px;
         }
 
         .card {
             background: #151515;
-            border: 1px solid #282828;
+            border: 1px solid #292929;
             border-radius: 20px;
             padding: 19px;
             margin-bottom: 14px;
@@ -59,11 +60,11 @@
         .label {
             color: #858585;
             font-size: 13px;
-            margin-bottom: 7px;
+            margin-bottom: 8px;
         }
 
         .value {
-            font-size: 20px;
+            font-size: 19px;
             font-weight: bold;
         }
 
@@ -74,7 +75,7 @@
         .section-title {
             font-size: 21px;
             font-weight: bold;
-            margin: 28px 0 14px;
+            margin: 27px 0 14px;
         }
 
         .tariff {
@@ -82,7 +83,7 @@
             border: 1px solid #292929;
             border-radius: 20px;
             padding: 19px;
-            margin-bottom: 13px;
+            margin-bottom: 14px;
         }
 
         .tariff-name {
@@ -91,26 +92,37 @@
         }
 
         .tariff-description {
-            color: #888;
+            color: #888888;
             margin-top: 7px;
             font-size: 14px;
+            line-height: 1.4;
         }
 
         .price {
-            font-size: 18px;
+            font-size: 19px;
             margin-top: 12px;
         }
 
-        button {
+        .buy-button {
             width: 100%;
-            border: 0;
+            border: none;
             border-radius: 14px;
-            padding: 15px;
+            padding: 16px;
             margin-top: 14px;
-            background: white;
-            color: black;
+
+            background: #ffffff;
+            color: #000000;
+
             font-size: 16px;
             font-weight: bold;
+
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .buy-button:active {
+            transform: scale(0.98);
+            opacity: 0.8;
         }
 
         .info {
@@ -118,7 +130,14 @@
             color: #707070;
             font-size: 13px;
             line-height: 1.5;
-            margin-top: 28px;
+            margin-top: 27px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #aaaaaa;
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -167,6 +186,8 @@
     </div>
 
 
+    <!-- 7 ДНЕЙ -->
+
     <div class="tariff">
 
         <div class="tariff-name">
@@ -174,19 +195,25 @@
         </div>
 
         <div class="tariff-description">
-            Отличный вариант для проверки VPN
+            Отличный вариант, чтобы попробовать VPN.
         </div>
 
         <div class="price">
             <b>59 ⭐</b>
         </div>
 
-        <button onclick="buy(7)">
+        <button
+            type="button"
+            class="buy-button"
+            onclick="buy(7)"
+        >
             Купить за 59 ⭐
         </button>
 
     </div>
 
+
+    <!-- 30 ДНЕЙ -->
 
     <div class="tariff">
 
@@ -195,19 +222,25 @@
         </div>
 
         <div class="tariff-description">
-            Месячная подписка
+            Месячная подписка на ОтвалиVPN.
         </div>
 
         <div class="price">
             <b>129 ⭐</b>
         </div>
 
-        <button onclick="buy(30)">
+        <button
+            type="button"
+            class="buy-button"
+            onclick="buy(30)"
+        >
             Купить за 129 ⭐
         </button>
 
     </div>
 
+
+    <!-- 90 ДНЕЙ -->
 
     <div class="tariff">
 
@@ -216,23 +249,32 @@
         </div>
 
         <div class="tariff-description">
-            Выгодная подписка на 3 месяца
+            Выгодная подписка на 3 месяца.
         </div>
 
         <div class="price">
             <b>399 ⭐</b>
         </div>
 
-        <button onclick="buy(90)">
+        <button
+            type="button"
+            class="buy-button"
+            onclick="buy(90)"
+        >
             Купить за 399 ⭐
         </button>
 
     </div>
 
 
+    <div id="loading" class="loading">
+        Создаём счёт...
+    </div>
+
+
     <div class="info">
         ⭐ Оплата производится через Telegram Stars.<br>
-        После оплаты доступ будет активирован автоматически.
+        После успешной оплаты подписка будет активирована.
     </div>
 
 </div>
@@ -248,71 +290,97 @@
 
     async function buy(days) {
 
-    try {
+        const loading = document.getElementById("loading");
 
-        const response = await fetch("/create-invoice", {
+        loading.style.display = "block";
 
-            method: "POST",
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+        try {
 
-            body: JSON.stringify({
-                tariff: String(days)
-            })
+            const response = await fetch("/create-invoice", {
 
-        });
+                method: "POST",
 
-        const data = await response.json();
+                headers: {
+                    "Content-Type": "application/json"
+                },
 
-        if (!data.ok) {
+                body: JSON.stringify({
+                    tariff: String(days)
+                })
 
-            tg.showAlert(
-                "Ошибка: " + data.error
-            );
+            });
 
-            return;
-        }
 
-        tg.openInvoice(
-            data.invoice,
-            function(status) {
+            if (!response.ok) {
 
-                if (status === "paid") {
-
-                    tg.showAlert(
-                        "🎉 Оплата прошла успешно!"
-                    );
-
-                } else if (status === "cancelled") {
-
-                    tg.showAlert(
-                        "Оплата отменена."
-                    );
-
-                } else if (status === "failed") {
-
-                    tg.showAlert(
-                        "Оплата не прошла."
-                    );
-
-                }
+                throw new Error(
+                    "HTTP " + response.status
+                );
 
             }
-        );
 
-    } catch (error) {
 
-        tg.showAlert(
-            "Не удалось создать счёт."
-        );
+            const data = await response.json();
 
-        console.error(error);
 
-    }
+            if (!data.ok) {
 
-    }
+                throw new Error(
+                    data.error || "Не удалось создать счёт"
+                );
+
+            }
+
+
+            loading.style.display = "none";
+
+
+            tg.openInvoice(
+                data.invoice,
+                function(status) {
+
+                    if (status === "paid") {
+
+                        tg.showAlert(
+                            "🎉 Оплата прошла успешно!"
+                        );
+
+                    }
+
+                    else if (status === "cancelled") {
+
+                        tg.showAlert(
+                            "Оплата отменена."
+                        );
+
+                    }
+
+                    else if (status === "failed") {
+
+                        tg.showAlert(
+                            "❌ Оплата не прошла."
+                        );
+
+                    }
+
+                }
+            );
+
+        }
+
+        catch (error) {
+
+            loading.style.display = "none";
+
+            console.error(error);
+
+            tg.showAlert(
+                "❌ Не удалось создать счёт.\n\n" +
+                "Попробуйте ещё раз."
+            );
+
+        }
 
     }
 

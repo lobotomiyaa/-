@@ -23,11 +23,12 @@ from aiogram.types import (
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-# Telegram ID администратора.
-# Добавим его в Railway Variables.
+# Твой Telegram ID.
+# Он уже должен быть добавлен в Railway Variables.
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 
 WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
+
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -61,15 +62,18 @@ TARIFFS = {
 
 # ============================================================
 # ВРЕМЕННОЕ ХРАНИЛИЩЕ
-# БД подключим позже
+#
+# БД НЕ НУЖНА.
+#
+# 3X-UI сама хранит VPN-клиента и срок его действия.
+# Здесь мы временно храним данные, которые нужны боту.
 # ============================================================
 
 subscriptions = {}
 
-# VPN-ссылки пользователей
 vpn_links = {}
 
-# Состояние ручной выдачи VPN администратором
+# Состояние администратора при выдаче VPN
 admin_states = {}
 
 
@@ -152,15 +156,19 @@ async def create_invoice(data: InvoiceRequest):
 
 
 # ============================================================
-# ЕДИНЫЙ MESSAGE HANDLER
+# ГЛАВНЫЙ MESSAGE HANDLER
 # ============================================================
 
 @dp.message()
 async def handle_message(message: types.Message):
 
-    # --------------------------------------------------------
+    user_id = message.from_user.id
+    text = message.text or ""
+
+
+    # ========================================================
     # УСПЕШНАЯ ОПЛАТА
-    # --------------------------------------------------------
+    # ========================================================
 
     if message.successful_payment:
 
@@ -191,12 +199,16 @@ async def handle_message(message: types.Message):
         if payment.total_amount != tariff["price"]:
             return
 
-        user_id = message.from_user.id
 
         now = datetime.now(timezone.utc)
 
-        old_expiration = subscriptions.get(user_id)
+        old_expiration = subscriptions.get(
+            user_id
+        )
 
+
+        # Если подписка ещё действует,
+        # продлеваем от её текущего окончания.
         if (
             old_expiration
             and old_expiration > now
@@ -208,74 +220,130 @@ async def handle_message(message: types.Message):
 
             start_from = now
 
+
         expiration = (
             start_from
             + timedelta(days=tariff["days"])
         )
 
+
         subscriptions[user_id] = expiration
+
 
         payment_id = (
             payment.telegram_payment_charge_id
         )
 
-        # Если VPN уже был выдан ранее,
-        # пока оставляем существующую ссылку.
-        existing_link = vpn_links.get(user_id)
 
-        if existing_link:
+        # ----------------------------------------------------
+        # СООБЩЕНИЕ ПОКУПАТЕЛЮ
+        # ----------------------------------------------------
 
-            await message.answer(
+        await message.answer(
 
-                "🎉 <b>Оплата прошла успешно!</b>\n\n"
+            "🎉 <b>Оплата прошла успешно!</b>\n\n"
 
-                f"{tariff['name']}\n"
-                f"💫 Оплачено: {tariff['price']} ⭐\n\n"
+            f"{tariff['name']}\n"
+            f"💫 Оплачено: {tariff['price']} ⭐\n\n"
 
-                "🟢 Подписка продлена.\n"
+            "🟢 Подписка активирована.\n"
 
-                f"📅 До: "
-                f"{expiration.strftime('%d.%m.%Y')}\n\n"
+            f"📅 Действует до: "
+            f"{expiration.strftime('%d.%m.%Y')}\n\n"
 
-                "🔗 <b>Твоя VPN-подписка:</b>\n"
-                f"<code>{existing_link}</code>\n\n"
+            "🪦 <b>VPN сейчас выдаётся.</b>\n\n"
 
-                "📱 Добавь эту ссылку в Happ или "
-                "другое приложение для VPN.",
+            "Как только VPN будет готов, "
+            "ссылка придёт сюда автоматически.",
 
-                parse_mode="HTML"
-            )
+            parse_mode="HTML"
+        )
+
+
+        # ----------------------------------------------------
+        # ИНФОРМАЦИЯ ДЛЯ АДМИНА
+        # ----------------------------------------------------
+
+        username = message.from_user.username
+
+        if username:
+
+            user_display = f"@{username}"
 
         else:
 
-            await message.answer(
+            first_name = (
+                message.from_user.first_name
+                or "Без имени"
+            )
 
-                "🎉 <b>Оплата прошла успешно!</b>\n\n"
+            user_display = first_name
 
-                f"{tariff['name']}\n"
-                f"💫 Оплачено: {tariff['price']} ⭐\n\n"
 
-                "🟢 Подписка активирована.\n"
+        admin_keyboard = InlineKeyboardMarkup(
 
-                f"📅 До: "
-                f"{expiration.strftime('%d.%m.%Y')}\n\n"
+            inline_keyboard=[
 
-                "🪦 <b>VPN ещё выдаётся вручную.</b>\n\n"
+                [
+                    InlineKeyboardButton(
+                        text="🪦 ВЫДАТЬ VPN",
+                        callback_data=f"admin_give_{user_id}"
+                    )
+                ]
+            ]
+        )
 
-                "После создания VPN-подписки "
-                "вы получите ссылку здесь.",
+
+        try:
+
+            await bot.send_message(
+
+                chat_id=ADMIN_ID,
+
+                text=(
+
+                    "💰 <b>НОВАЯ ПОКУПКА</b>\n\n"
+
+                    f"👤 Пользователь: "
+                    f"{user_display}\n"
+
+                    f"🆔 Telegram ID: "
+                    f"<code>{user_id}</code>\n\n"
+
+                    f"📦 Тариф: "
+                    f"{tariff['name']}\n"
+
+                    f"💫 Оплачено: "
+                    f"{tariff['price']} ⭐\n\n"
+
+                    f"📅 Действует до: "
+                    f"{expiration.strftime('%d.%m.%Y')}\n\n"
+
+                    "⚠️ <b>Нужно выдать VPN.</b>"
+
+                ),
+
+                reply_markup=admin_keyboard,
 
                 parse_mode="HTML"
             )
+
+        except Exception as error:
+
+            print(
+                "Ошибка отправки уведомления админу:",
+                error
+            )
+
 
         return
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # /START
-    # --------------------------------------------------------
+    # ========================================================
 
-    if message.text == "/start":
+    if text == "/start":
 
         keyboard = InlineKeyboardMarkup(
 
@@ -332,6 +400,7 @@ async def handle_message(message: types.Message):
             ]
         )
 
+
         await message.answer(
 
             "👋 Добро пожаловать "
@@ -352,28 +421,31 @@ async def handle_message(message: types.Message):
         return
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # /MYID
-    # --------------------------------------------------------
+    # ========================================================
 
-    if message.text == "/myid":
+    if text == "/myid":
 
         await message.answer(
-            f"🆔 Твой Telegram ID:\n\n"
-            f"<code>{message.from_user.id}</code>",
+
+            "🆔 Твой Telegram ID:\n\n"
+            f"<code>{user_id}</code>",
+
             parse_mode="HTML"
         )
 
         return
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # /GIVEVPN
-    # --------------------------------------------------------
+    # Оставляем старую команду как запасной вариант.
+    # ========================================================
 
-    if message.text == "/givevpn":
+    if text == "/givevpn":
 
-        if message.from_user.id != ADMIN_ID:
+        if user_id != ADMIN_ID:
 
             await message.answer(
                 "⛔ У тебя нет доступа к этой команде."
@@ -381,21 +453,19 @@ async def handle_message(message: types.Message):
 
             return
 
-        admin_states[message.from_user.id] = {
+
+        admin_states[user_id] = {
             "step": "user_id"
         }
+
 
         await message.answer(
 
             "👤 <b>Выдача VPN</b>\n\n"
 
-            "Отправь Telegram ID пользователя, "
-            "которому нужно выдать VPN.\n\n"
+            "Отправь Telegram ID пользователя.\n\n"
 
-            "Например:\n"
-            "<code>123456789</code>\n\n"
-
-            "Для отмены напиши /cancel.",
+            "Для отмены: /cancel",
 
             parse_mode="HTML"
         )
@@ -403,15 +473,16 @@ async def handle_message(message: types.Message):
         return
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # /CANCEL
-    # --------------------------------------------------------
+    # ========================================================
 
-    if message.text == "/cancel":
+    if text == "/cancel":
 
-        if message.from_user.id in admin_states:
+        if user_id in admin_states:
 
-            del admin_states[message.from_user.id]
+            del admin_states[user_id]
+
 
         await message.answer(
             "❌ Операция отменена."
@@ -420,38 +491,39 @@ async def handle_message(message: types.Message):
         return
 
 
-    # --------------------------------------------------------
-    # РУЧНАЯ ВЫДАЧА VPN
-    # --------------------------------------------------------
+    # ========================================================
+    # СТАРАЯ РУЧНАЯ ВЫДАЧА
+    # ========================================================
 
-    if message.from_user.id == ADMIN_ID:
+    if user_id == ADMIN_ID:
 
-        state = admin_states.get(
-            message.from_user.id
-        )
+        state = admin_states.get(user_id)
+
 
         if state:
 
-            # -----------------------------------------------
-            # ШАГ 1 — TELEGRAM ID
-            # -----------------------------------------------
+            # ------------------------------------------------
+            # ВВОД TELEGRAM ID
+            # ------------------------------------------------
 
             if state["step"] == "user_id":
 
                 try:
 
                     target_user_id = int(
-                        message.text.strip()
+                        text.strip()
                     )
 
                 except:
 
                     await message.answer(
+
                         "❌ Неверный Telegram ID.\n\n"
                         "Отправь только цифры."
                     )
 
                     return
+
 
                 state["target_user_id"] = (
                     target_user_id
@@ -459,15 +531,15 @@ async def handle_message(message: types.Message):
 
                 state["step"] = "vpn_link"
 
+
                 await message.answer(
 
-                    "🔗 Отлично.\n\n"
+                    "🔗 <b>Теперь нужна VPN-ссылка.</b>\n\n"
 
-                    "Теперь зайди в 3X-UI, "
-                    "создай пользователя и скопируй "
-                    "его <b>subscription-ссылку</b>.\n\n"
+                    "Зайди в 3X-UI, создай клиента "
+                    "и скопируй его subscription-ссылку.\n\n"
 
-                    "После этого отправь ссылку сюда.\n\n"
+                    "Отправь ссылку сюда.\n\n"
 
                     "Для отмены: /cancel",
 
@@ -477,13 +549,14 @@ async def handle_message(message: types.Message):
                 return
 
 
-            # -----------------------------------------------
-            # ШАГ 2 — VPN LINK
-            # -----------------------------------------------
+            # ------------------------------------------------
+            # ВВОД VPN ССЫЛКИ
+            # ------------------------------------------------
 
             if state["step"] == "vpn_link":
 
-                vpn_link = message.text.strip()
+                vpn_link = text.strip()
+
 
                 if not (
                     vpn_link.startswith("http://")
@@ -502,20 +575,22 @@ async def handle_message(message: types.Message):
 
                     return
 
+
                 target_user_id = (
                     state["target_user_id"]
                 )
 
+
                 vpn_links[target_user_id] = vpn_link
 
-                del admin_states[
-                    message.from_user.id
-                ]
 
-                # Получаем срок подписки
+                del admin_states[user_id]
+
+
                 expiration = subscriptions.get(
                     target_user_id
                 )
+
 
                 if expiration:
 
@@ -531,20 +606,21 @@ async def handle_message(message: types.Message):
                         "срок не найден"
                     )
 
-                # Сообщение админу
+
                 await message.answer(
 
                     "✅ <b>VPN выдан!</b>\n\n"
 
-                    f"👤 ID: <code>{target_user_id}</code>\n"
-                    f"📅 До: {expiration_text}\n\n"
+                    f"👤 ID: "
+                    f"<code>{target_user_id}</code>\n"
 
-                    "🔗 Ссылка сохранена.",
+                    f"📅 До: "
+                    f"{expiration_text}",
 
                     parse_mode="HTML"
                 )
 
-                # Отправляем пользователю
+
                 try:
 
                     await bot.send_message(
@@ -565,6 +641,7 @@ async def handle_message(message: types.Message):
                             f"<code>{vpn_link}</code>\n\n"
 
                             "📱 <b>Как подключиться:</b>\n"
+
                             "1. Скопируй ссылку.\n"
                             "2. Открой Happ.\n"
                             "3. Добавь подписку по ссылке.\n"
@@ -572,28 +649,34 @@ async def handle_message(message: types.Message):
                             "5. Подключись.\n\n"
 
                             "🗡 Не передавай эту ссылку другим людям."
+
                         ),
 
                         parse_mode="HTML"
                     )
 
-                except Exception:
+                except Exception as error:
+
+                    print(
+                        "Ошибка отправки VPN:",
+                        error
+                    )
 
                     await message.answer(
 
                         "⚠️ VPN сохранён, "
-                        "но бот не смог отправить "
-                        "сообщение пользователю.\n\n"
+                        "но сообщение пользователю "
+                        "отправить не получилось.\n\n"
 
-                        "Возможно, пользователь ещё "
-                        "не запускал бота через /start."
+                        "Проверь, что пользователь "
+                        "уже запускал бота через /start."
                     )
 
                 return
 
 
 # ============================================================
-# КНОПКИ
+# CALLBACKS
 # ============================================================
 
 @dp.callback_query()
@@ -601,18 +684,82 @@ async def callbacks(
     callback: types.CallbackQuery
 ):
 
-    # --------------------------------------------------------
+    data = callback.data or ""
+
+
+    # ========================================================
+    # АДМИН — ВЫДАТЬ VPN
+    # ========================================================
+
+    if data.startswith("admin_give_"):
+
+        if callback.from_user.id != ADMIN_ID:
+
+            await callback.answer(
+                "⛔ Нет доступа.",
+                show_alert=True
+            )
+
+            return
+
+
+        target_user_id = int(
+            data.replace(
+                "admin_give_",
+                ""
+            )
+        )
+
+
+        admin_states[
+            callback.from_user.id
+        ] = {
+
+            "step": "vpn_link",
+
+            "target_user_id":
+                target_user_id
+        }
+
+
+        await callback.message.answer(
+
+            "🪦 <b>Выдача VPN</b>\n\n"
+
+            f"👤 Пользователь:\n"
+            f"<code>{target_user_id}</code>\n\n"
+
+            "Теперь создай клиента в 3X-UI "
+            "и отправь сюда его "
+            "<b>subscription-ссылку</b>.\n\n"
+
+            "После отправки ссылки бот "
+            "автоматически передаст её пользователю.\n\n"
+
+            "Для отмены: /cancel",
+
+            parse_mode="HTML"
+        )
+
+
+        await callback.answer()
+
+        return
+
+
+    # ========================================================
     # ПОКУПКА
-    # --------------------------------------------------------
+    # ========================================================
 
-    if callback.data.startswith("buy_"):
+    if data.startswith("buy_"):
 
-        tariff_id = callback.data.replace(
+        tariff_id = data.replace(
             "buy_",
             ""
         )
 
         tariff = TARIFFS.get(tariff_id)
+
 
         if not tariff:
 
@@ -622,6 +769,7 @@ async def callbacks(
             )
 
             return
+
 
         await bot.send_invoice(
 
@@ -655,11 +803,17 @@ async def callbacks(
             ]
         )
 
-    # --------------------------------------------------------
-    # ПОДПИСКА
-    # --------------------------------------------------------
 
-    elif callback.data == "subscription":
+        await callback.answer()
+
+        return
+
+
+    # ========================================================
+    # МОЯ ПОДПИСКА
+    # ========================================================
+
+    if data == "subscription":
 
         user_id = callback.from_user.id
 
@@ -670,6 +824,7 @@ async def callbacks(
         vpn_link = vpn_links.get(
             user_id
         )
+
 
         if (
             expiration
@@ -684,6 +839,7 @@ async def callbacks(
 
             days_left = remaining.days
 
+
             text = (
 
                 "🪦 <b>Моя подписка</b>\n\n"
@@ -697,26 +853,34 @@ async def callbacks(
                 f"{expiration.strftime('%d.%m.%Y')}\n\n"
             )
 
+
             if vpn_link:
 
                 text += (
 
                     "🔗 <b>VPN-подписка:</b>\n\n"
+
                     f"<code>{vpn_link}</code>\n\n"
+
                     "📱 Добавь ссылку в Happ."
                 )
 
             else:
 
                 text += (
+
                     "⏳ VPN-ссылка ещё "
                     "выдаётся вручную."
                 )
 
+
             await callback.message.answer(
+
                 text,
+
                 parse_mode="HTML"
             )
+
 
         else:
 
@@ -731,11 +895,17 @@ async def callbacks(
                 parse_mode="HTML"
             )
 
-    # --------------------------------------------------------
-    # УСЛОВИЯ
-    # --------------------------------------------------------
 
-    elif callback.data == "terms":
+        await callback.answer()
+
+        return
+
+
+    # ========================================================
+    # УСЛОВИЯ
+    # ========================================================
+
+    if data == "terms":
 
         await callback.message.answer(
 
@@ -760,11 +930,17 @@ async def callbacks(
             parse_mode="HTML"
         )
 
-    # --------------------------------------------------------
-    # ПОДДЕРЖКА
-    # --------------------------------------------------------
 
-    elif callback.data == "support":
+        await callback.answer()
+
+        return
+
+
+    # ========================================================
+    # ПОДДЕРЖКА
+    # ========================================================
+
+    if data == "support":
 
         await callback.message.answer(
 
@@ -783,6 +959,12 @@ async def callbacks(
             parse_mode="HTML"
         )
 
+
+        await callback.answer()
+
+        return
+
+
     await callback.answer()
 
 
@@ -798,6 +980,7 @@ async def process_pre_checkout(
     payload = (
         pre_checkout_query.invoice_payload
     )
+
 
     if (
         not payload.startswith("vpn_")
@@ -815,13 +998,18 @@ async def process_pre_checkout(
 
         return
 
+
     tariff_id = (
         payload
         .replace("vpn_", "")
         .replace("_days", "")
     )
 
-    tariff = TARIFFS.get(tariff_id)
+
+    tariff = TARIFFS.get(
+        tariff_id
+    )
+
 
     if not tariff:
 
@@ -835,6 +1023,7 @@ async def process_pre_checkout(
         )
 
         return
+
 
     if (
         pre_checkout_query.currency
@@ -852,6 +1041,7 @@ async def process_pre_checkout(
 
         return
 
+
     if (
         pre_checkout_query.total_amount
         != tariff["price"]
@@ -868,13 +1058,14 @@ async def process_pre_checkout(
 
         return
 
+
     await pre_checkout_query.answer(
         ok=True
     )
 
 
 # ============================================================
-# КОМАНДЫ
+# /TERMS
 # ============================================================
 
 @dp.message(
@@ -908,6 +1099,10 @@ async def terms_command(
         parse_mode="HTML"
     )
 
+
+# ============================================================
+# /PAYSUPPORT
+# ============================================================
 
 @dp.message(
     lambda message:
@@ -961,6 +1156,7 @@ async def setup_bot():
             )
         ]
     )
+
 
     await bot.set_chat_menu_button(
 

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    >
+
+    <title>ОтвалиVPN</title>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #090909;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            padding: 24px 18px 30px;
+            max-width: 500px;
+            margin: auto;
+        }
+
+        .logo {
+            text-align: center;
+            font-size: 48px;
+            margin-top: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 10px 0 5px;
+            font-size: 30px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #999;
+            margin-bottom: 30px;
+        }
+
+        .status {
+            background: #151515;
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #292929;
+        }
+
+        .status-title {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .status-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .online {
+            color: #52d273;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 25px 0 12px;
+        }
+
+        .tariff {
+            background: #151515;
+            border: 1px solid #292929;
+            border-radius: 18px;
+            padding: 18px;
+            margin-bottom: 12px;
+        }
+
+        .tariff-name {
+            font-size: 19px;
+            font-weight: bold;
+        }
+
+        .tariff-price {
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        button {
+            width: 100%;
+            border: 0;
+            border-radius: 14px;
+            padding: 15px;
+            margin-top: 13px;
+            background: #ffffff;
+            color: #000000;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .footer {
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="logo">🪦</div>
+
+    <h1>ОтвалиVPN</h1>
+
+    <div class="subtitle">
+        ❄ Быстрый. Простой. Приватный.
+    </div>
+
+    <div class="status">
+        <div class="status-title">Статус VPN</div>
+        <div class="status-value online">
+            ● Доступен
+        </div>
+    </div>
+
+    <div class="status">
+        <div class="status-title">Текущая подписка</div>
+        <div class="status-value">
+            Нет активной подписки
+        </div>
+    </div>
+
+    <div class="section-title">
+        🗡 Тарифы
+    </div>
+
+    <div class="tariff">
+        <div class="tariff-name">
+            🪡 7 дней
+        </div>
+
+        <div class="tariff-price">
+            99 ⭐
+        </div>
+
+        <button onclick="buy(7)">
+            Купить
+        </button>
+    </div>
+
+    <div class="tariff">
+        <div class="tariff-name">
+            🧶 30 дней
+        </div>
+
+        <div class="tariff-price">
+            299 ⭐
+        </div>
+
+        <button onclick="buy(30)">
+            Купить
+        </button>
+    </div>
+
+    <div class="tariff">
+        <div class="tariff-name">
+            ❄ 90 дней
+        </div>
+
+        <div class="tariff-price">
+            699 ⭐
+        </div>
+
+        <button onclick="buy(90)">
+            Купить
+        </button>
+    </div>
+
+    <div class="footer">
+        ОтвалиVPN 🪦
+    </div>
+
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+
+    tg.ready();
+    tg.expand();
+
+    function buy(days) {
+        tg.showAlert(
+            "Тариф на " + days + " дней выбран.\n\nОплату подключим следующим этапом ⭐"
+        );
+    }
+</script>
+
+</body>
+</html>

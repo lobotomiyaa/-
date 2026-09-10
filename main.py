@@ -1,1306 +1,745 @@
-import asyncio
 import os
+import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-
-from aiogram import Bot, Dispatcher, types
+from aiohttp import web
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import Command
 from aiogram.types import (
+    Message,
+    CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     WebAppInfo,
-    LabeledPrice,
-    BotCommand,
     MenuButtonWebApp,
 )
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 
 
-# ============================================================
+# =========================
 # НАСТРОЙКИ
-# ============================================================
+# =========================
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-
-# Твой основной ID берётся из Railway
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 
-# Дополнительные администраторы
+# Твой друг
+FRIEND_ADMIN_ID = 1404271536
+
 ADMIN_IDS = {
     ADMIN_ID,
-    1404271536,
+    FRIEND_ADMIN_ID,
 }
+
+# Реквизиты берём из Railway Variables
+PAYMENT_DETAILS = os.environ.get(
+    "PAYMENT_DETAILS",
+    "Реквизиты для оплаты пока не настроены."
+)
 
 WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
 
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-app = FastAPI()
-
-
-# ============================================================
+# =========================
 # ТАРИФЫ
-# ============================================================
+# =========================
 
 TARIFFS = {
-    "7": {
+    7: {
         "days": 7,
-        "price": 59,
-        "name": "🪡 7 дней",
+        "price": 60,
+        "name": "7 дней",
     },
-
-    "30": {
+    14: {
+        "days": 14,
+        "price": 100,
+        "name": "14 дней",
+    },
+    30: {
         "days": 30,
-        "price": 129,
-        "name": "🪦 30 дней",
+        "price": 200,
+        "name": "30 дней",
     },
-
-    "90": {
+    90: {
         "days": 90,
         "price": 399,
-        "name": "📜 90 дней",
+        "name": "90 дней",
     },
 }
 
 
-# ============================================================
-# ВРЕМЕННОЕ ХРАНИЛИЩЕ
-# ============================================================
+# =========================
+# ДАННЫЕ
+# =========================
 
 subscriptions = {}
 
-vpn_links = {}
-
-subscription_tariffs = {}
+pending_payments = {}
 
 admin_states = {}
 
 
-# ============================================================
+# =========================
+# BOT
+# =========================
+
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(
+        parse_mode=ParseMode.HTML
+    )
+)
+
+dp = Dispatcher()
+
+
+# =========================
 # КЛАВИАТУРЫ
-# ============================================================
+# =========================
 
 def main_keyboard():
-
     return InlineKeyboardMarkup(
-
         inline_keyboard=[
-
             [
                 InlineKeyboardButton(
                     text="🪡 Открыть ОтвалиVPN",
-                    web_app=WebAppInfo(
-                        url=WEBAPP_URL
-                    )
+                    web_app=WebAppInfo(url=WEBAPP_URL)
                 )
             ],
-
             [
                 InlineKeyboardButton(
-                    text="🪦 7 дней — 59 ⭐",
+                    text="7 дней — 60 руб",
                     callback_data="buy_7"
                 )
             ],
-
             [
                 InlineKeyboardButton(
-                    text="📜 30 дней — 129 ⭐",
+                    text="14 дней — 100 руб",
+                    callback_data="buy_14"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="30 дней — 200 руб",
                     callback_data="buy_30"
                 )
             ],
-
             [
                 InlineKeyboardButton(
-                    text="🕊️ 90 дней — 399 ⭐",
+                    text="90 дней — 399 руб",
                     callback_data="buy_90"
                 )
             ],
-
             [
                 InlineKeyboardButton(
                     text="💷 Моя подписка",
-                    callback_data="subscription"
+                    callback_data="my_subscription"
                 )
             ],
-
             [
                 InlineKeyboardButton(
                     text="⚔️ Условия",
                     callback_data="terms"
                 ),
-
                 InlineKeyboardButton(
                     text="🪡 Поддержка",
                     callback_data="support"
-                )
-            ]
-
+                ),
+            ],
         ]
     )
 
 
-def back_keyboard():
-
+def payment_keyboard(days: int):
     return InlineKeyboardMarkup(
-
         inline_keyboard=[
-
             [
                 InlineKeyboardButton(
-                    text="🪡 Главное меню",
-                    callback_data="main_menu"
-                )
-            ]
-
-        ]
-    )
-
-
-def subscription_keyboard():
-
-    return InlineKeyboardMarkup(
-
-        inline_keyboard=[
-
-            [
-                InlineKeyboardButton(
-                    text="🪡 Купить / продлить VPN",
-                    web_app=WebAppInfo(
-                        url=WEBAPP_URL
-                    )
+                    text="✅ Я оплатил",
+                    callback_data=f"paid_{days}"
                 )
             ],
-
             [
                 InlineKeyboardButton(
-                    text="🪡 Главное меню",
-                    callback_data="main_menu"
+                    text="❌ Отмена",
+                    callback_data="cancel_payment"
                 )
-            ]
-
+            ],
         ]
     )
 
 
-# ============================================================
-# WEB
-# ============================================================
-
-@app.get("/")
-async def home():
-
-    return {
-        "status": "ok",
-        "service": "OtvaliVPN"
-    }
-
-
-@app.get("/app", response_class=HTMLResponse)
-async def webapp():
-
-    with open(
-        "webapp.html",
-        "r",
-        encoding="utf-8"
-    ) as file:
-
-        return file.read()
-
-
-# ============================================================
-# СОЗДАНИЕ INVOICE ИЗ MINI APP
-# ============================================================
-
-class InvoiceRequest(BaseModel):
-
-    tariff: str
-
-
-@app.post("/create-invoice")
-async def create_invoice(data: InvoiceRequest):
-
-    tariff = TARIFFS.get(data.tariff)
-
-    if not tariff:
-
-        return {
-            "ok": False,
-            "error": "Тариф не найден"
-        }
-
-    payload = f"vpn_{data.tariff}_days"
-
-    invoice_link = await bot.create_invoice_link(
-
-        title=f"ОтвалиVPN — {tariff['days']} дней",
-
-        description=(
-            f"Доступ к ОтвалиVPN "
-            f"на {tariff['days']} дней."
-        ),
-
-        payload=payload,
-
-        currency="XTR",
-
-        prices=[
-            LabeledPrice(
-                label=(
-                    f"ОтвалиVPN — "
-                    f"{tariff['days']} дней"
-                ),
-                amount=tariff["price"]
-            )
+def admin_payment_keyboard(user_id: int, days: int):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ ПОДТВЕРДИТЬ ОПЛАТУ",
+                    callback_data=f"confirm_payment_{user_id}_{days}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ ОТКЛОНИТЬ",
+                    callback_data=f"reject_payment_{user_id}"
+                )
+            ],
         ]
     )
 
-    return {
-        "ok": True,
-        "invoice": invoice_link
-    }
 
+# =========================
+# /START
+# =========================
 
-# ============================================================
-# ГЛАВНЫЙ MESSAGE HANDLER
-# ============================================================
+@dp.message(Command("start"))
+async def start(message: Message):
+    text = (
+        "🪡 <b>ОтвалиVPN</b>\n\n"
+        "Быстрый VPN без лишнего гемора.\n\n"
+        "Выбирай тариф ниже или открывай приложение."
+    )
 
-@dp.message()
-async def handle_message(message: types.Message):
+    await message.answer(
+        text,
+        reply_markup=main_keyboard()
+    )
 
-    user_id = message.from_user.id
-    text = message.text or ""
 
+# =========================
+# WEB APP DATA
+# =========================
 
-    # ========================================================
-    # УСПЕШНАЯ ОПЛАТА
-    # ========================================================
+@dp.message(F.web_app_data)
+async def web_app_data(message: Message):
+    data = message.web_app_data.data
 
-    if message.successful_payment:
-
-        payment = message.successful_payment
-
-        payload = payment.invoice_payload
-
-        if (
-            not payload.startswith("vpn_")
-            or not payload.endswith("_days")
-        ):
-            return
-
-        tariff_id = (
-            payload
-            .replace("vpn_", "")
-            .replace("_days", "")
-        )
-
-        tariff = TARIFFS.get(tariff_id)
-
-        if not tariff:
-            return
-
-        if payment.currency != "XTR":
-            return
-
-        if payment.total_amount != tariff["price"]:
-            return
-
-
-        now = datetime.now(timezone.utc)
-
-        old_expiration = subscriptions.get(
-            user_id
-        )
-
-
-        if (
-            old_expiration
-            and old_expiration > now
-        ):
-
-            start_from = old_expiration
-
-        else:
-
-            start_from = now
-
-
-        expiration = (
-            start_from
-            + timedelta(days=tariff["days"])
-        )
-
-
-        subscriptions[user_id] = expiration
-
-        subscription_tariffs[user_id] = tariff_id
-
-
-        # ----------------------------------------------------
-        # СООБЩЕНИЕ ПОКУПАТЕЛЮ
-        # ----------------------------------------------------
-
-        await message.answer(
-
-            "🎉 <b>Оплата прошла успешно!</b>\n\n"
-
-            f"{tariff['name']}\n"
-            f"💫 Оплачено: {tariff['price']} ⭐\n\n"
-
-            "🟢 <b>Подписка активирована.</b>\n"
-
-            f"📅 Действует до: "
-            f"{expiration.strftime('%d.%m.%Y')}\n\n"
-
-            "🪦 <b>Теперь выдаём VPN.</b>\n\n"
-
-            "Как только VPN будет готов, "
-            "ссылка автоматически придёт "
-            "в этот чат.",
-
-            parse_mode="HTML"
-        )
-
-
-        # ----------------------------------------------------
-        # ИНФОРМАЦИЯ ДЛЯ АДМИНОВ
-        # ----------------------------------------------------
-
-        username = message.from_user.username
-
-        if username:
-
-            user_display = f"@{username}"
-
-        else:
-
-            first_name = (
-                message.from_user.first_name
-                or "Без имени"
-            )
-
-            user_display = first_name
-
-
-        admin_keyboard = InlineKeyboardMarkup(
-
-            inline_keyboard=[
-
-                [
-                    InlineKeyboardButton(
-                        text="🪦 ВЫДАТЬ VPN",
-                        callback_data=f"admin_give_{user_id}"
-                    )
-                ]
-
-            ]
-        )
-
-
-        admin_text = (
-
-            "💰 <b>НОВАЯ ПОКУПКА</b>\n\n"
-
-            f"👤 Пользователь: "
-            f"{user_display}\n"
-
-            f"🆔 Telegram ID: "
-            f"<code>{user_id}</code>\n\n"
-
-            f"📦 Тариф: "
-            f"{tariff['name']}\n"
-
-            f"💫 Оплачено: "
-            f"{tariff['price']} ⭐\n\n"
-
-            f"📅 Действует до: "
-            f"{expiration.strftime('%d.%m.%Y')}\n\n"
-
-            "⚠️ <b>Нужно выдать VPN.</b>"
-        )
-
-
-        # Отправляем уведомление ВСЕМ администраторам
-        for admin_id in ADMIN_IDS:
-
-            if admin_id == 0:
-                continue
-
-            try:
-
-                await bot.send_message(
-
-                    chat_id=admin_id,
-
-                    text=admin_text,
-
-                    reply_markup=admin_keyboard,
-
-                    parse_mode="HTML"
-                )
-
-            except Exception as error:
-
-                print(
-                    f"Ошибка отправки уведомления админу "
-                    f"{admin_id}:",
-                    error
-                )
-
-
+    if not data.startswith("buy:"):
         return
 
-
-    # ========================================================
-    # /START
-    # ========================================================
-
-    if text == "/start":
-
-        await message.answer(
-
-            "👋 <b>Добро пожаловать в ОтвалиVPN!</b>\n\n"
-
-            "🪡 Быстрый и простой VPN\n"
-            "⚔️ Защищённое соединение\n"
-            "📜 Простое подключение\n"
-            "🪦 Без лишних сложностей\n\n"
-
-            "Выбери тариф или открой приложение:",
-
-            reply_markup=main_keyboard(),
-
-            parse_mode="HTML"
-        )
-
+    try:
+        days = int(data.split(":")[1])
+    except (ValueError, IndexError):
         return
 
-
-    # ========================================================
-    # /MYID
-    # ========================================================
-
-    if text == "/myid":
-
-        await message.answer(
-
-            "🆔 Твой Telegram ID:\n\n"
-            f"<code>{user_id}</code>",
-
-            parse_mode="HTML"
-        )
-
+    if days not in TARIFFS:
         return
 
-
-    # ========================================================
-    # /GIVEVPN
-    # ========================================================
-
-    if text == "/givevpn":
-
-        if user_id not in ADMIN_IDS:
-
-            await message.answer(
-                "⛔ У тебя нет доступа к этой команде."
-            )
-
-            return
-
-
-        admin_states[user_id] = {
-            "step": "user_id"
-        }
-
-
-        await message.answer(
-
-            "👤 <b>Выдача VPN</b>\n\n"
-
-            "Отправь Telegram ID пользователя.\n\n"
-
-            "Для отмены: /cancel",
-
-            parse_mode="HTML"
-        )
-
-        return
-
-
-    # ========================================================
-    # /CANCEL
-    # ========================================================
-
-    if text == "/cancel":
-
-        if user_id in admin_states:
-
-            del admin_states[user_id]
-
-
-        await message.answer(
-            "❌ Операция отменена."
-        )
-
-        return
-
-
-    # ========================================================
-    # РУЧНАЯ ВЫДАЧА VPN
-    # ========================================================
-
-    if user_id in ADMIN_IDS:
-
-        state = admin_states.get(user_id)
-
-
-        if state:
-
-            # ------------------------------------------------
-            # TELEGRAM ID
-            # ------------------------------------------------
-
-            if state["step"] == "user_id":
-
-                try:
-
-                    target_user_id = int(
-                        text.strip()
-                    )
-
-                except:
-
-                    await message.answer(
-
-                        "❌ Неверный Telegram ID.\n\n"
-                        "Отправь только цифры."
-                    )
-
-                    return
-
-
-                state["target_user_id"] = (
-                    target_user_id
-                )
-
-                state["step"] = "vpn_link"
-
-
-                await message.answer(
-
-                    "🔗 <b>Теперь нужна VPN-ссылка.</b>\n\n"
-
-                    "Создай клиента в 3X-UI "
-                    "и скопируй его subscription-ссылку.\n\n"
-
-                    "Отправь ссылку сюда.\n\n"
-
-                    "Для отмены: /cancel",
-
-                    parse_mode="HTML"
-                )
-
-                return
-
-
-            # ------------------------------------------------
-            # VPN LINK
-            # ------------------------------------------------
-
-            if state["step"] == "vpn_link":
-
-                vpn_link = text.strip()
-
-
-                if not (
-                    vpn_link.startswith("http://")
-                    or vpn_link.startswith("https://")
-                    or vpn_link.startswith("vless://")
-                    or vpn_link.startswith("vmess://")
-                ):
-
-                    await message.answer(
-
-                        "❌ Похоже, это не VPN-ссылка.\n\n"
-
-                        "Отправь subscription-ссылку "
-                        "из 3X-UI ещё раз."
-                    )
-
-                    return
-
-
-                target_user_id = (
-                    state["target_user_id"]
-                )
-
-
-                vpn_links[target_user_id] = vpn_link
-
-
-                del admin_states[user_id]
-
-
-                expiration = subscriptions.get(
-                    target_user_id
-                )
-
-
-                if expiration:
-
-                    expiration_text = (
-                        expiration.strftime(
-                            "%d.%m.%Y"
-                        )
-                    )
-
-                else:
-
-                    expiration_text = (
-                        "срок не найден"
-                    )
-
-
-                await message.answer(
-
-                    "✅ <b>VPN выдан!</b>\n\n"
-
-                    f"👤 ID: "
-                    f"<code>{target_user_id}</code>\n"
-
-                    f"📅 До: "
-                    f"{expiration_text}",
-
-                    parse_mode="HTML"
-                )
-
-
-                try:
-
-                    await bot.send_message(
-
-                        chat_id=target_user_id,
-
-                        text=(
-
-                            "🪦 <b>ОтвалиVPN активирован!</b>\n\n"
-
-                            "🎉 Твоя VPN-подписка готова.\n\n"
-
-                            f"📅 Действует до: "
-                            f"{expiration_text}\n\n"
-
-                            "🔗 <b>Твоя ссылка подписки:</b>\n\n"
-
-                            f"<code>{vpn_link}</code>\n\n"
-
-                            "📱 <b>Как подключиться:</b>\n\n"
-
-                            "1. Скопируй ссылку.\n"
-                            "2. Открой Happ.\n"
-                            "3. Добавь подписку по ссылке.\n"
-                            "4. Обнови подписку.\n"
-                            "5. Подключись.\n\n"
-
-                            "⚔️ <b>Не передавай ссылку "
-                            "другим людям.</b>"
-
-                        ),
-
-                        reply_markup=subscription_keyboard(),
-
-                        parse_mode="HTML"
-                    )
-
-                except Exception as error:
-
-                    print(
-                        "Ошибка отправки VPN:",
-                        error
-                    )
-
-                    await message.answer(
-
-                        "⚠️ VPN сохранён, "
-                        "но сообщение пользователю "
-                        "отправить не получилось.\n\n"
-
-                        "Проверь, что пользователь "
-                        "уже запускал бота через /start."
-                    )
-
-                return
-
-
-# ============================================================
-# CALLBACKS
-# ============================================================
-
-@dp.callback_query()
-async def callbacks(
-    callback: types.CallbackQuery
+    tariff = TARIFFS[days]
+
+    await send_payment_info(
+        message,
+        days,
+        tariff["price"]
+    )
+
+
+# =========================
+# ПОКУПКА
+# =========================
+
+async def send_payment_info(
+    message: Message,
+    days: int,
+    price: int
 ):
+    tariff = TARIFFS[days]
 
-    data = callback.data or ""
+    text = (
+        f"<b>Покупка VPN — {tariff['name']}</b>\n\n"
+        f"Стоимость: <b>{price} руб</b>\n\n"
+        f"💳 <b>Реквизиты для оплаты:</b>\n"
+        f"<code>{PAYMENT_DETAILS}</code>\n\n"
+        "После перевода нажми кнопку ниже.\n"
+        "Оплата проверяется вручную."
+    )
+
+    pending_payments[message.from_user.id] = {
+        "days": days,
+        "price": price,
+        "created": datetime.now(timezone.utc),
+    }
+
+    await message.answer(
+        text,
+        reply_markup=payment_keyboard(days)
+    )
 
 
-    # ========================================================
-    # ГЛАВНОЕ МЕНЮ
-    # ========================================================
+# =========================
+# КНОПКИ ТАРИФОВ
+# =========================
 
-    if data == "main_menu":
-
-        await callback.message.answer(
-
-            "🪦 <b>ОтвалиVPN</b>\n\n"
-
-            "🪡 Быстрый и простой VPN\n"
-            "⚔️ Защищённое соединение\n"
-            "📜 Простое подключение\n"
-            "🪦 Без лишних сложностей\n\n"
-
-            "Выбери действие:",
-
-            reply_markup=main_keyboard(),
-
-            parse_mode="HTML"
-        )
-
-        await callback.answer()
-
+@dp.callback_query(F.data.startswith("buy_"))
+async def buy_callback(callback: CallbackQuery):
+    try:
+        days = int(callback.data.split("_")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка")
         return
 
-
-    # ========================================================
-    # АДМИН — ВЫДАТЬ VPN
-    # ========================================================
-
-    if data.startswith("admin_give_"):
-
-        if callback.from_user.id not in ADMIN_IDS:
-
-            await callback.answer(
-                "⛔ Нет доступа.",
-                show_alert=True
-            )
-
-            return
-
-
-        target_user_id = int(
-            data.replace(
-                "admin_give_",
-                ""
-            )
-        )
-
-
-        admin_states[
-            callback.from_user.id
-        ] = {
-
-            "step": "vpn_link",
-
-            "target_user_id":
-                target_user_id
-        }
-
-
-        await callback.message.answer(
-
-            "🪦 <b>Выдача VPN</b>\n\n"
-
-            f"👤 Пользователь:\n"
-            f"<code>{target_user_id}</code>\n\n"
-
-            "Создай клиента в 3X-UI "
-            "и отправь сюда его "
-            "<b>subscription-ссылку</b>.\n\n"
-
-            "После отправки ссылки бот "
-            "автоматически передаст её пользователю.\n\n"
-
-            "Для отмены: /cancel",
-
-            parse_mode="HTML"
-        )
-
-
-        await callback.answer()
-
+    if days not in TARIFFS:
+        await callback.answer("Такого тарифа нет")
         return
 
-
-    # ========================================================
-    # ПОКУПКА
-    # ========================================================
-
-    if data.startswith("buy_"):
-
-        tariff_id = data.replace(
-            "buy_",
-            ""
-        )
-
-        tariff = TARIFFS.get(tariff_id)
-
-
-        if not tariff:
-
-            await callback.answer(
-                "Тариф не найден",
-                show_alert=True
-            )
-
-            return
-
-
-        await bot.send_invoice(
-
-            chat_id=callback.from_user.id,
-
-            title=(
-                f"ОтвалиVPN — "
-                f"{tariff['days']} дней"
-            ),
-
-            description=(
-                f"Доступ к ОтвалиVPN "
-                f"на {tariff['days']} дней."
-            ),
-
-            payload=f"vpn_{tariff_id}_days",
-
-            currency="XTR",
-
-            prices=[
-
-                LabeledPrice(
-
-                    label=(
-                        f"ОтвалиVPN — "
-                        f"{tariff['days']} дней"
-                    ),
-
-                    amount=tariff["price"]
-                )
-            ]
-        )
-
-
-        await callback.answer()
-
-        return
-
-
-    # ========================================================
-    # МОЯ ПОДПИСКА
-    # ========================================================
-
-    if data == "subscription":
-
-        user_id = callback.from_user.id
-
-        expiration = subscriptions.get(
-            user_id
-        )
-
-        vpn_link = vpn_links.get(
-            user_id
-        )
-
-        tariff_id = subscription_tariffs.get(
-            user_id
-        )
-
-        tariff = TARIFFS.get(
-            tariff_id
-        ) if tariff_id else None
-
-
-        now = datetime.now(timezone.utc)
-
-
-        if (
-            expiration
-            and expiration > now
-        ):
-
-            remaining = expiration - now
-
-            days_left = max(
-                1,
-                int(
-                    (
-                        remaining.total_seconds()
-                        + 86399
-                    ) // 86400
-                )
-            )
-
-            tariff_name = (
-                tariff["name"]
-                if tariff
-                else "VPN"
-            )
-
-
-            text = (
-
-                "💷 <b>Моя подписка</b>\n\n"
-
-                "🟢 <b>Статус:</b> активна\n"
-
-                f"📦 <b>Тариф:</b> "
-                f"{tariff_name}\n"
-
-                f"⏱ <b>Осталось:</b> "
-                f"{days_left} дней\n"
-
-                f"📅 <b>До:</b> "
-                f"{expiration.strftime('%d.%m.%Y')}\n\n"
-            )
-
-
-            if vpn_link:
-
-                text += (
-
-                    "🔗 <b>VPN-подписка:</b>\n\n"
-
-                    f"<code>{vpn_link}</code>\n\n"
-
-                    "📱 Скопируй ссылку и добавь "
-                    "её в Happ.\n\n"
-
-                    "⚔️ Не передавай ссылку другим."
-                )
-
-            else:
-
-                text += (
-
-                    "⏳ <b>VPN ещё выдаётся.</b>\n\n"
-
-                    "Мы получили оплату. "
-                    "Как только ссылка будет готова, "
-                    "она придёт сюда автоматически."
-                )
-
-
-            await callback.message.answer(
-
-                text,
-
-                reply_markup=subscription_keyboard(),
-
-                parse_mode="HTML"
-            )
-
-
-        else:
-
-            await callback.message.answer(
-
-                "💷 <b>Моя подписка</b>\n\n"
-
-                "🔴 <b>Активной подписки нет.</b>\n\n"
-
-                "Выбери тариф, чтобы подключить "
-                "ОтвалиVPN.",
-
-                reply_markup=main_keyboard(),
-
-                parse_mode="HTML"
-            )
-
-
-        await callback.answer()
-
-        return
-
-
-    # ========================================================
-    # УСЛОВИЯ
-    # ========================================================
-
-    if data == "terms":
-
-        await callback.message.answer(
-
-            "⚔️ <b>Условия использования "
-            "ОтвалиVPN</b>\n\n"
-
-            "После успешной оплаты пользователь "
-            "получает доступ к VPN на выбранный срок.\n\n"
-
-            "⏱ Срок подписки начинается после "
-            "успешного завершения оплаты.\n\n"
-
-            "🪡 Данные доступа нельзя передавать "
-            "другим людям.\n\n"
-
-            "⚖️ Использование VPN должно соответствовать "
-            "законодательству вашей страны.\n\n"
-
-            "🛠 По вопросам оплаты и доступа "
-            "обращайтесь в поддержку.",
-
-            reply_markup=back_keyboard(),
-
-            parse_mode="HTML"
-        )
-
-
-        await callback.answer()
-
-        return
-
-
-    # ========================================================
-    # ПОДДЕРЖКА
-    # ========================================================
-
-    if data == "support":
-
-        await callback.message.answer(
-
-            "🪡 <b>Поддержка ОтвалиVPN</b>\n\n"
-
-            "Возникла проблема? Не переживай.\n\n"
-
-            "Напиши в поддержку и укажи:\n\n"
-
-            "• 👤 Telegram username или ID\n"
-            "• 📦 купленный тариф\n"
-            "• ❌ что именно не работает\n"
-            "• 💫 информацию об оплате, "
-            "если проблема связана с платежом\n\n"
-
-            "🪦 Если VPN оплачен, но ссылка "
-            "не пришла — мы проверим оплату "
-            "и выдадим доступ вручную.",
-
-            reply_markup=back_keyboard(),
-
-            parse_mode="HTML"
-        )
-
-
-        await callback.answer()
-
-        return
-
+    tariff = TARIFFS[days]
 
     await callback.answer()
 
-
-# ============================================================
-# PRE-CHECKOUT
-# ============================================================
-
-@dp.pre_checkout_query()
-async def process_pre_checkout(
-    pre_checkout_query: types.PreCheckoutQuery
-):
-
-    payload = (
-        pre_checkout_query.invoice_payload
+    await send_payment_info(
+        callback.message,
+        days,
+        tariff["price"]
     )
 
 
-    if (
-        not payload.startswith("vpn_")
-        or not payload.endswith("_days")
-    ):
+# =========================
+# Я ОПЛАТИЛ
+# =========================
 
-        await pre_checkout_query.answer(
-
-            ok=False,
-
-            error_message=(
-                "Неизвестный тариф."
-            )
-        )
-
+@dp.callback_query(F.data.startswith("paid_"))
+async def paid_callback(callback: CallbackQuery):
+    try:
+        days = int(callback.data.split("_")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка")
         return
 
+    if days not in TARIFFS:
+        await callback.answer("Ошибка")
+        return
 
-    tariff_id = (
-        payload
-        .replace("vpn_", "")
-        .replace("_days", "")
+    user_id = callback.from_user.id
+    tariff = TARIFFS[days]
+
+    pending_payments[user_id] = {
+        "days": days,
+        "price": tariff["price"],
+        "created": datetime.now(timezone.utc),
+    }
+
+    await callback.answer(
+        "Заявка отправлена администратору."
+    )
+
+    await callback.message.edit_text(
+        "🟡 <b>Ожидаем подтверждение оплаты</b>\n\n"
+        f"Тариф: {tariff['name']}\n"
+        f"Сумма: {tariff['price']} руб\n\n"
+        "Администратор проверит перевод и подтвердит оплату."
+    )
+
+    username = (
+        f"@{callback.from_user.username}"
+        if callback.from_user.username
+        else "без username"
+    )
+
+    admin_text = (
+        "💰 <b>НОВАЯ ОПЛАТА</b>\n\n"
+        f"👤 Пользователь: {username}\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"📦 Тариф: <b>{tariff['name']}</b>\n"
+        f"💵 Сумма: <b>{tariff['price']} руб</b>\n\n"
+        "Проверь поступление денег в банковском приложении."
+    )
+
+    for admin_id in ADMIN_IDS:
+        if admin_id == 0:
+            continue
+
+        try:
+            await bot.send_message(
+                admin_id,
+                admin_text,
+                reply_markup=admin_payment_keyboard(
+                    user_id,
+                    days
+                )
+            )
+        except Exception as e:
+            logging.error(
+                f"Ошибка отправки админу {admin_id}: {e}"
+            )
+
+
+# =========================
+# ПОДТВЕРДИТЬ ОПЛАТУ
+# =========================
+
+@dp.callback_query(F.data.startswith("confirm_payment_"))
+async def confirm_payment(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+
+    parts = callback.data.split("_")
+
+    try:
+        user_id = int(parts[2])
+        days = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка")
+        return
+
+    if days not in TARIFFS:
+        await callback.answer("Ошибка тарифа")
+        return
+
+    tariff = TARIFFS[days]
+
+    if user_id not in pending_payments:
+        await callback.answer(
+            "Заявка уже обработана или отсутствует."
+        )
+        return
+
+    now = datetime.now(timezone.utc)
+
+    old_sub = subscriptions.get(user_id)
+
+    if old_sub and old_sub["expires"] > now:
+        expires = old_sub["expires"] + timedelta(days=days)
+    else:
+        expires = now + timedelta(days=days)
+
+    subscriptions[user_id] = {
+        "days": days,
+        "price": tariff["price"],
+        "expires": expires,
+    }
+
+    del pending_payments[user_id]
+
+    admin_states[callback.from_user.id] = {
+        "type": "vpn_for_payment",
+        "user_id": user_id,
+        "days": days,
+    }
+
+    await callback.answer("Оплата подтверждена")
+
+    await callback.message.edit_text(
+        callback.message.text
+        + "\n\n✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>\n"
+        "Теперь отправьте VPN-ссылку следующим сообщением."
+    )
+
+    await bot.send_message(
+        callback.from_user.id,
+        "🔗 <b>Отправь VPN subscription URL</b>\n\n"
+        "Просто вставь сюда ссылку из 3X-UI."
+    )
+
+    await bot.send_message(
+        user_id,
+        "✅ <b>Оплата подтверждена!</b>\n\n"
+        "Администратор сейчас выдаёт тебе VPN."
     )
 
 
-    tariff = TARIFFS.get(
-        tariff_id
+# =========================
+# ОТКЛОНИТЬ ОПЛАТУ
+# =========================
+
+@dp.callback_query(F.data.startswith("reject_payment_"))
+async def reject_payment(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("Нет доступа")
+        return
+
+    try:
+        user_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError):
+        await callback.answer("Ошибка")
+        return
+
+    pending_payments.pop(user_id, None)
+
+    await callback.answer("Оплата отклонена")
+
+    await callback.message.edit_text(
+        callback.message.text
+        + "\n\n❌ <b>ОПЛАТА ОТКЛОНЕНА</b>"
+    )
+
+    try:
+        await bot.send_message(
+            user_id,
+            "❌ <b>Оплата не подтверждена.</b>\n\n"
+            "Если ты уже переводил деньги, обратись в поддержку."
+        )
+    except Exception:
+        pass
+
+
+# =========================
+# ПРИЁМ VPN ССЫЛКИ ОТ АДМИНА
+# =========================
+
+@dp.message(F.text)
+async def text_handler(message: Message):
+    user_id = message.from_user.id
+
+    if user_id in ADMIN_IDS and user_id in admin_states:
+
+        state = admin_states[user_id]
+
+        if state["type"] == "vpn_for_payment":
+            buyer_id = state["user_id"]
+
+            vpn_link = message.text.strip()
+
+            if not (
+                vpn_link.startswith("http://")
+                or vpn_link.startswith("https://")
+                or vpn_link.startswith("vless://")
+                or vpn_link.startswith("vmess://")
+                or vpn_link.startswith("trojan://")
+                or vpn_link.startswith("ss://")
+            ):
+                await message.answer(
+                    "❌ Это не похоже на VPN subscription URL.\n\n"
+                    "Просто вставь ссылку из 3X-UI."
+                )
+                return
+
+            try:
+                await bot.send_message(
+                    buyer_id,
+                    "🎉 <b>VPN готов!</b>\n\n"
+                    "Твоя ссылка:\n\n"
+                    f"<code>{vpn_link}</code>\n\n"
+                    "Добавь её в HAPP или V2Ray."
+                )
+
+                await message.answer(
+                    "✅ VPN успешно отправлен пользователю."
+                )
+
+            except Exception as e:
+                await message.answer(
+                    f"❌ Не удалось отправить VPN:\n{e}"
+                )
+
+            del admin_states[user_id]
+            return
+
+    await message.answer(
+        "Выбери действие в меню 👇",
+        reply_markup=main_keyboard()
     )
 
 
-    if not tariff:
+# =========================
+# МОЯ ПОДПИСКА
+# =========================
 
-        await pre_checkout_query.answer(
+@dp.callback_query(F.data == "my_subscription")
+async def my_subscription(callback: CallbackQuery):
+    user_id = callback.from_user.id
 
-            ok=False,
+    sub = subscriptions.get(user_id)
 
-            error_message=(
-                "Этот тариф недоступен."
-            )
+    if not sub:
+        await callback.answer()
+        await callback.message.answer(
+            "💷 <b>У тебя пока нет активной подписки.</b>\n\n"
+            "Выбери тариф ниже.",
+            reply_markup=main_keyboard()
         )
-
         return
 
+    expires = sub["expires"]
 
-    if (
-        pre_checkout_query.currency
-        != "XTR"
-    ):
+    await callback.answer()
 
-        await pre_checkout_query.answer(
-
-            ok=False,
-
-            error_message=(
-                "Неверная валюта."
-            )
-        )
-
-        return
-
-
-    if (
-        pre_checkout_query.total_amount
-        != tariff["price"]
-    ):
-
-        await pre_checkout_query.answer(
-
-            ok=False,
-
-            error_message=(
-                "Цена тарифа изменилась."
-            )
-        )
-
-        return
-
-
-    await pre_checkout_query.answer(
-        ok=True
+    await callback.message.answer(
+        "💷 <b>Моя подписка</b>\n\n"
+        f"📦 Тариф: {sub['days']} дней\n"
+        f"📅 Действует до: "
+        f"<b>{expires.strftime('%d.%m.%Y %H:%M')}</b> UTC"
     )
 
 
-# ============================================================
+# =========================
+# УСЛОВИЯ
+# =========================
+
+@dp.callback_query(F.data == "terms")
+async def terms_callback(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.answer(
+        "⚔️ <b>Условия ОтвалиVPN</b>\n\n"
+        "• VPN предоставляется на оплаченный срок.\n"
+        "• После окончания срока доступ прекращается.\n"
+        "• Ссылка предназначена только для покупателя.\n"
+        "• Не передавай VPN-ссылку другим людям.\n"
+        "• При проблемах обращайся в поддержку."
+    )
+
+
+@dp.callback_query(F.data == "support")
+async def support_callback(callback: CallbackQuery):
+    await callback.answer()
+
+    await callback.message.answer(
+        "🪡 <b>Поддержка</b>\n\n"
+        "Если возникла проблема с оплатой или VPN — "
+        "напиши администратору."
+    )
+
+
+# =========================
+# /MYID
+# =========================
+
+@dp.message(Command("myid"))
+async def myid(message: Message):
+    await message.answer(
+        f"🆔 Твой Telegram ID:\n<code>{message.from_user.id}</code>"
+    )
+
+
+# =========================
 # /TERMS
-# ============================================================
+# =========================
 
-@dp.message(
-    lambda message:
-    message.text == "/terms"
-)
-async def terms_command(
-    message: types.Message
-):
-
+@dp.message(Command("terms"))
+async def terms_command(message: Message):
     await message.answer(
-
-        "⚔️ <b>Условия использования "
-        "ОтвалиVPN</b>\n\n"
-
-        "После успешной оплаты пользователь "
-        "получает доступ к VPN на выбранный срок.\n\n"
-
-        "⏱ Срок подписки начинается после "
-        "успешного завершения оплаты.\n\n"
-
-        "🪡 Данные доступа нельзя передавать "
-        "другим людям.\n\n"
-
-        "⚖️ Использование VPN должно соответствовать "
-        "законодательству вашей страны.\n\n"
-
-        "🛠 По вопросам оплаты и доступа "
-        "обращайтесь в поддержку.",
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
+        "⚔️ <b>Условия ОтвалиVPN</b>\n\n"
+        "VPN предоставляется на оплаченный срок.\n"
+        "Не передавай VPN-ссылку другим людям."
     )
 
 
-# ============================================================
-# /PAYSUPPORT
-# ============================================================
+# =========================
+# /PAY
+# =========================
 
-@dp.message(
-    lambda message:
-    message.text == "/paysupport"
-)
-async def paysupport_command(
-    message: types.Message
-):
-
+@dp.message(Command("pay"))
+async def pay_command(message: Message):
     await message.answer(
-
-        "🪡 <b>Поддержка ОтвалиVPN</b>\n\n"
-
-        "Возникла проблема с оплатой, "
-        "подпиской или VPN?\n\n"
-
-        "Напиши в поддержку и укажи:\n\n"
-
-        "• 👤 Telegram username или ID\n"
-        "• 📦 купленный тариф\n"
-        "• ❌ описание проблемы\n"
-        "• 💫 информацию о платеже, "
-        "если она есть\n\n"
-
-        "🪦 Если VPN оплачен, но ссылка "
-        "не пришла — мы проверим оплату "
-        "и выдадим доступ вручную.",
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
+        "Выбери тариф:",
+        reply_markup=main_keyboard()
     )
 
 
-# ============================================================
-# НАСТРОЙКА МЕНЮ TELEGRAM
-# ============================================================
+# =========================
+# /GIVEVPN — РЕЗЕРВНЫЙ СПОСОБ
+# =========================
+
+@dp.message(Command("givevpn"))
+async def givevpn(message: Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("Нет доступа.")
+        return
+
+    args = message.text.split(maxsplit=2)
+
+    if len(args) < 3:
+        await message.answer(
+            "Использование:\n"
+            "<code>/givevpn TELEGRAM_ID VPN_LINK</code>"
+        )
+        return
+
+    try:
+        buyer_id = int(args[1])
+    except ValueError:
+        await message.answer("❌ Неверный Telegram ID.")
+        return
+
+    vpn_link = args[2].strip()
+
+    try:
+        await bot.send_message(
+            buyer_id,
+            "🎉 <b>VPN готов!</b>\n\n"
+            f"<code>{vpn_link}</code>\n\n"
+            "Добавь ссылку в HAPP или V2Ray."
+        )
+
+        await message.answer(
+            "✅ VPN отправлен."
+        )
+
+    except Exception as e:
+        await message.answer(
+            f"❌ Ошибка:\n{e}"
+        )
+
+
+# =========================
+# WEB SERVER ДЛЯ RAILWAY
+# =========================
+
+async def health(request):
+    return web.Response(
+        text="ОтвалиVPN работает!"
+    )
+
+
+async def start_web_server():
+    app = web.Application()
+
+    app.router.add_get("/", health)
+
+    async def mini_app(request):
+        try:
+            with open("webapp.html", "r", encoding="utf-8") as f:
+                html = f.read()
+
+            return web.Response(
+                text=html,
+                content_type="text/html"
+            )
+
+        except FileNotFoundError:
+            return web.Response(
+                text="webapp.html not found",
+                status=404
+            )
+
+    app.router.add_get("/app", mini_app)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    port = int(os.environ.get("PORT", "8080"))
+
+    site = web.TCPSite(
+        runner,
+        "0.0.0.0",
+        port
+    )
+
+    await site.start()
+
+    logging.info(
+        f"Web server started on port {port}"
+    )
+
+
+# =========================
+# НАСТРОЙКА TELEGRAM
+# =========================
 
 async def setup_bot():
-
-    await bot.set_my_commands(
-
-        commands=[
-
-            BotCommand(
-                command="start",
-                description="🪡 Запустить ОтвалиVPN"
-            ),
-
-            BotCommand(
-                command="terms",
-                description="⚔️ Условия использования"
-            ),
-
-            BotCommand(
-                command="paysupport",
-                description="🪡 Поддержка по оплате"
-            )
-        ]
-    )
-
+    await bot.set_my_commands([
+        ("start", "Запустить ОтвалиVPN"),
+        ("pay", "Купить VPN"),
+        ("myid", "Мой Telegram ID"),
+        ("terms", "Условия"),
+    ])
 
     await bot.set_chat_menu_button(
-
         menu_button=MenuButtonWebApp(
-
             text="🪡 ОтвалиVPN",
-
             web_app=WebAppInfo(
                 url=WEBAPP_URL
             )
@@ -1308,30 +747,27 @@ async def setup_bot():
     )
 
 
-# ============================================================
+# =========================
 # ЗАПУСК
-# ============================================================
+# =========================
 
-async def start_bot():
-
-    await bot.delete_webhook(
-        drop_pending_updates=True
+async def main():
+    logging.basicConfig(
+        level=logging.INFO
     )
 
+    if not BOT_TOKEN:
+        raise RuntimeError(
+            "BOT_TOKEN не найден в Railway Variables"
+        )
+
     await setup_bot()
+    await start_web_server()
+
+    logging.info("ОтвалиVPN запущен!")
 
     await dp.start_polling(bot)
 
 
-@app.on_event("startup")
-async def startup():
-
-    asyncio.create_task(
-        start_bot()
-    )
-
-
-@app.on_event("shutdown")
-async def shutdown():
-
-    await bot.session.close()
+if __name__ == "__main__":
+    asyncio.run(main())

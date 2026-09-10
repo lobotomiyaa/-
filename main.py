@@ -18,14 +18,14 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 
-# =========================
+# =========================================================
 # НАСТРОЙКИ
-# =========================
+# =========================================================
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 
-# Твой друг
+# ID второго администратора
 FRIEND_ADMIN_ID = 1404271536
 
 ADMIN_IDS = {
@@ -33,7 +33,7 @@ ADMIN_IDS = {
     FRIEND_ADMIN_ID,
 }
 
-# Реквизиты берём из Railway Variables
+# Реквизиты НЕ храним в коде
 PAYMENT_DETAILS = os.environ.get(
     "PAYMENT_DETAILS",
     "Реквизиты для оплаты пока не настроены."
@@ -42,9 +42,9 @@ PAYMENT_DETAILS = os.environ.get(
 WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
 
 
-# =========================
+# =========================================================
 # ТАРИФЫ
-# =========================
+# =========================================================
 
 TARIFFS = {
     7: {
@@ -52,16 +52,19 @@ TARIFFS = {
         "price": 60,
         "name": "7 дней",
     },
+
     14: {
         "days": 14,
         "price": 100,
         "name": "14 дней",
     },
+
     30: {
         "days": 30,
         "price": 200,
         "name": "30 дней",
     },
+
     90: {
         "days": 90,
         "price": 399,
@@ -70,9 +73,9 @@ TARIFFS = {
 }
 
 
-# =========================
-# ДАННЫЕ
-# =========================
+# =========================================================
+# ВРЕМЕННЫЕ ДАННЫЕ
+# =========================================================
 
 subscriptions = {}
 
@@ -81,9 +84,12 @@ pending_payments = {}
 admin_states = {}
 
 
-# =========================
+# =========================================================
 # BOT
-# =========================
+# =========================================================
+
+if not BOT_TOKEN:
+    logging.warning("BOT_TOKEN пока не установлен.")
 
 bot = Bot(
     token=BOT_TOKEN,
@@ -95,54 +101,65 @@ bot = Bot(
 dp = Dispatcher()
 
 
-# =========================
+# =========================================================
 # КЛАВИАТУРЫ
-# =========================
+# =========================================================
 
 def main_keyboard():
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="🪡 Открыть ОтвалиVPN",
-                    web_app=WebAppInfo(url=WEBAPP_URL)
+                    web_app=WebAppInfo(
+                        url=WEBAPP_URL
+                    )
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="7 дней — 60 руб",
                     callback_data="buy_7"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="14 дней — 100 руб",
                     callback_data="buy_14"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="30 дней — 200 руб",
                     callback_data="buy_30"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="90 дней — 399 руб",
                     callback_data="buy_90"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="💷 Моя подписка",
                     callback_data="my_subscription"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="⚔️ Условия",
                     callback_data="terms"
                 ),
+
                 InlineKeyboardButton(
                     text="🪡 Поддержка",
                     callback_data="support"
@@ -152,50 +169,59 @@ def main_keyboard():
     )
 
 
-def payment_keyboard(days: int):
+def payment_keyboard(days):
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="✅ Я оплатил",
                     callback_data=f"paid_{days}"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="❌ Отмена",
                     callback_data="cancel_payment"
                 )
             ],
+
         ]
     )
 
 
-def admin_payment_keyboard(user_id: int, days: int):
+def admin_payment_keyboard(user_id, days):
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="✅ ПОДТВЕРДИТЬ ОПЛАТУ",
                     callback_data=f"confirm_payment_{user_id}_{days}"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="❌ ОТКЛОНИТЬ",
                     callback_data=f"reject_payment_{user_id}"
                 )
             ],
+
         ]
     )
 
 
-# =========================
-# /START
-# =========================
+# =========================================================
+# START
+# =========================================================
 
 @dp.message(Command("start"))
 async def start(message: Message):
+
     text = (
         "🪡 <b>ОтвалиVPN</b>\n\n"
         "Быстрый VPN без лишнего гемора.\n\n"
@@ -208,12 +234,13 @@ async def start(message: Message):
     )
 
 
-# =========================
-# WEB APP DATA
-# =========================
+# =========================================================
+# WEB APP
+# =========================================================
 
 @dp.message(F.web_app_data)
 async def web_app_data(message: Message):
+
     data = message.web_app_data.data
 
     if not data.startswith("buy:"):
@@ -236,25 +263,17 @@ async def web_app_data(message: Message):
     )
 
 
-# =========================
-# ПОКУПКА
-# =========================
+# =========================================================
+# ИНФОРМАЦИЯ ОБ ОПЛАТЕ
+# =========================================================
 
 async def send_payment_info(
     message: Message,
     days: int,
     price: int
 ):
-    tariff = TARIFFS[days]
 
-    text = (
-        f"<b>Покупка VPN — {tariff['name']}</b>\n\n"
-        f"Стоимость: <b>{price} руб</b>\n\n"
-        f"💳 <b>Реквизиты для оплаты:</b>\n"
-        f"<code>{PAYMENT_DETAILS}</code>\n\n"
-        "После перевода нажми кнопку ниже.\n"
-        "Оплата проверяется вручную."
-    )
+    tariff = TARIFFS[days]
 
     pending_payments[message.from_user.id] = {
         "days": days,
@@ -262,26 +281,49 @@ async def send_payment_info(
         "created": datetime.now(timezone.utc),
     }
 
+    text = (
+        f"<b>Покупка VPN — {tariff['name']}</b>\n\n"
+
+        f"Стоимость: <b>{price} руб</b>\n\n"
+
+        f"💳 <b>Реквизиты для оплаты:</b>\n"
+        f"<code>{PAYMENT_DETAILS}</code>\n\n"
+
+        "После перевода нажми кнопку "
+        "«✅ Я оплатил».\n\n"
+
+        "Оплата проверяется администратором вручную."
+    )
+
     await message.answer(
         text,
         reply_markup=payment_keyboard(days)
     )
 
 
-# =========================
-# КНОПКИ ТАРИФОВ
-# =========================
+# =========================================================
+# ПОКУПКА ЧЕРЕЗ КНОПКУ TELEGRAM
+# =========================================================
 
 @dp.callback_query(F.data.startswith("buy_"))
 async def buy_callback(callback: CallbackQuery):
+
     try:
-        days = int(callback.data.split("_")[1])
+        days = int(
+            callback.data.split("_")[1]
+        )
+
     except (ValueError, IndexError):
+
         await callback.answer("Ошибка")
         return
 
     if days not in TARIFFS:
-        await callback.answer("Такого тарифа нет")
+
+        await callback.answer(
+            "Такого тарифа нет."
+        )
+
         return
 
     tariff = TARIFFS[days]
@@ -295,23 +337,31 @@ async def buy_callback(callback: CallbackQuery):
     )
 
 
-# =========================
+# =========================================================
 # Я ОПЛАТИЛ
-# =========================
+# =========================================================
 
 @dp.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
+
     try:
-        days = int(callback.data.split("_")[1])
+
+        days = int(
+            callback.data.split("_")[1]
+        )
+
     except (ValueError, IndexError):
+
         await callback.answer("Ошибка")
         return
 
     if days not in TARIFFS:
-        await callback.answer("Ошибка")
+
+        await callback.answer("Ошибка тарифа")
         return
 
     user_id = callback.from_user.id
+
     tariff = TARIFFS[days]
 
     pending_payments[user_id] = {
@@ -326,9 +376,12 @@ async def paid_callback(callback: CallbackQuery):
 
     await callback.message.edit_text(
         "🟡 <b>Ожидаем подтверждение оплаты</b>\n\n"
+
         f"Тариф: {tariff['name']}\n"
         f"Сумма: {tariff['price']} руб\n\n"
-        "Администратор проверит перевод и подтвердит оплату."
+
+        "Администратор проверит перевод "
+        "и подтвердит оплату."
     )
 
     username = (
@@ -339,18 +392,23 @@ async def paid_callback(callback: CallbackQuery):
 
     admin_text = (
         "💰 <b>НОВАЯ ОПЛАТА</b>\n\n"
+
         f"👤 Пользователь: {username}\n"
         f"🆔 ID: <code>{user_id}</code>\n"
         f"📦 Тариф: <b>{tariff['name']}</b>\n"
         f"💵 Сумма: <b>{tariff['price']} руб</b>\n\n"
-        "Проверь поступление денег в банковском приложении."
+
+        "Проверь поступление денег "
+        "в банковском приложении."
     )
 
     for admin_id in ADMIN_IDS:
+
         if admin_id == 0:
             continue
 
         try:
+
             await bot.send_message(
                 admin_id,
                 admin_text,
@@ -359,197 +417,357 @@ async def paid_callback(callback: CallbackQuery):
                     days
                 )
             )
+
         except Exception as e:
+
             logging.error(
-                f"Ошибка отправки админу {admin_id}: {e}"
+                f"Ошибка отправки админу "
+                f"{admin_id}: {e}"
             )
 
 
-# =========================
-# ПОДТВЕРДИТЬ ОПЛАТУ
-# =========================
+# =========================================================
+# ОТМЕНА
+# =========================================================
 
-@dp.callback_query(F.data.startswith("confirm_payment_"))
+@dp.callback_query(F.data == "cancel_payment")
+async def cancel_payment(callback: CallbackQuery):
+
+    pending_payments.pop(
+        callback.from_user.id,
+        None
+    )
+
+    await callback.answer(
+        "Покупка отменена."
+    )
+
+    await callback.message.answer(
+        "Покупка отменена.\n\n"
+        "Выбери тариф:",
+        reply_markup=main_keyboard()
+    )
+
+
+# =========================================================
+# ПОДТВЕРЖДЕНИЕ ОПЛАТЫ АДМИНОМ
+# =========================================================
+
+@dp.callback_query(
+    F.data.startswith("confirm_payment_")
+)
 async def confirm_payment(callback: CallbackQuery):
+
     if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
+
+        await callback.answer(
+            "Нет доступа."
+        )
+
         return
 
     parts = callback.data.split("_")
 
     try:
+
         user_id = int(parts[2])
         days = int(parts[3])
+
     except (ValueError, IndexError):
-        await callback.answer("Ошибка")
+
+        await callback.answer(
+            "Ошибка."
+        )
+
         return
 
     if days not in TARIFFS:
-        await callback.answer("Ошибка тарифа")
+
+        await callback.answer(
+            "Ошибка тарифа."
+        )
+
+        return
+
+    if user_id not in pending_payments:
+
+        await callback.answer(
+            "Заявка уже обработана."
+        )
+
         return
 
     tariff = TARIFFS[days]
-
-    if user_id not in pending_payments:
-        await callback.answer(
-            "Заявка уже обработана или отсутствует."
-        )
-        return
 
     now = datetime.now(timezone.utc)
 
     old_sub = subscriptions.get(user_id)
 
     if old_sub and old_sub["expires"] > now:
-        expires = old_sub["expires"] + timedelta(days=days)
+
+        expires = (
+            old_sub["expires"]
+            + timedelta(days=days)
+        )
+
     else:
-        expires = now + timedelta(days=days)
+
+        expires = (
+            now
+            + timedelta(days=days)
+        )
 
     subscriptions[user_id] = {
+
         "days": days,
+
         "price": tariff["price"],
+
         "expires": expires,
+
     }
 
     del pending_payments[user_id]
 
-    admin_states[callback.from_user.id] = {
+    admin_states[
+        callback.from_user.id
+    ] = {
+
         "type": "vpn_for_payment",
+
         "user_id": user_id,
+
         "days": days,
+
     }
 
-    await callback.answer("Оплата подтверждена")
+    await callback.answer(
+        "Оплата подтверждена."
+    )
 
     await callback.message.edit_text(
+
         callback.message.text
-        + "\n\n✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>\n"
-        "Теперь отправьте VPN-ссылку следующим сообщением."
+
+        + "\n\n"
+        "✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>\n"
+
+        "Теперь отправьте VPN-ссылку "
+        "следующим сообщением."
+
     )
 
     await bot.send_message(
+
         callback.from_user.id,
+
         "🔗 <b>Отправь VPN subscription URL</b>\n\n"
+
         "Просто вставь сюда ссылку из 3X-UI."
+
     )
 
     await bot.send_message(
+
         user_id,
+
         "✅ <b>Оплата подтверждена!</b>\n\n"
+
         "Администратор сейчас выдаёт тебе VPN."
+
     )
 
 
-# =========================
-# ОТКЛОНИТЬ ОПЛАТУ
-# =========================
+# =========================================================
+# ОТКЛОНЕНИЕ ОПЛАТЫ
+# =========================================================
 
-@dp.callback_query(F.data.startswith("reject_payment_"))
+@dp.callback_query(
+    F.data.startswith("reject_payment_")
+)
 async def reject_payment(callback: CallbackQuery):
+
     if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("Нет доступа")
+
+        await callback.answer(
+            "Нет доступа."
+        )
+
         return
 
     try:
-        user_id = int(callback.data.split("_")[2])
+
+        user_id = int(
+            callback.data.split("_")[2]
+        )
+
     except (ValueError, IndexError):
-        await callback.answer("Ошибка")
+
+        await callback.answer(
+            "Ошибка."
+        )
+
         return
 
-    pending_payments.pop(user_id, None)
+    pending_payments.pop(
+        user_id,
+        None
+    )
 
-    await callback.answer("Оплата отклонена")
+    await callback.answer(
+        "Оплата отклонена."
+    )
 
     await callback.message.edit_text(
+
         callback.message.text
-        + "\n\n❌ <b>ОПЛАТА ОТКЛОНЕНА</b>"
+
+        + "\n\n"
+        "❌ <b>ОПЛАТА ОТКЛОНЕНА</b>"
+
     )
 
     try:
+
         await bot.send_message(
+
             user_id,
+
             "❌ <b>Оплата не подтверждена.</b>\n\n"
-            "Если ты уже переводил деньги, обратись в поддержку."
+
+            "Если ты уже переводил деньги, "
+            "обратись в поддержку."
+
         )
+
     except Exception:
+
         pass
 
 
-# =========================
-# ПРИЁМ VPN ССЫЛКИ ОТ АДМИНА
-# =========================
+# =========================================================
+# ССЫЛКА VPN ОТ АДМИНА
+# =========================================================
 
 @dp.message(F.text)
 async def text_handler(message: Message):
+
     user_id = message.from_user.id
 
-    if user_id in ADMIN_IDS and user_id in admin_states:
+    if (
+        user_id in ADMIN_IDS
+        and user_id in admin_states
+    ):
 
         state = admin_states[user_id]
 
         if state["type"] == "vpn_for_payment":
+
             buyer_id = state["user_id"]
 
             vpn_link = message.text.strip()
 
-            if not (
+            valid = (
+
                 vpn_link.startswith("http://")
+
                 or vpn_link.startswith("https://")
+
                 or vpn_link.startswith("vless://")
+
                 or vpn_link.startswith("vmess://")
+
                 or vpn_link.startswith("trojan://")
+
                 or vpn_link.startswith("ss://")
-            ):
+
+            )
+
+            if not valid:
+
                 await message.answer(
-                    "❌ Это не похоже на VPN subscription URL.\n\n"
+
+                    "❌ Это не похоже "
+                    "на VPN subscription URL.\n\n"
+
                     "Просто вставь ссылку из 3X-UI."
+
                 )
+
                 return
 
             try:
+
                 await bot.send_message(
+
                     buyer_id,
+
                     "🎉 <b>VPN готов!</b>\n\n"
+
                     "Твоя ссылка:\n\n"
+
                     f"<code>{vpn_link}</code>\n\n"
+
                     "Добавь её в HAPP или V2Ray."
+
                 )
 
                 await message.answer(
-                    "✅ VPN успешно отправлен пользователю."
+
+                    "✅ VPN успешно "
+                    "отправлен пользователю."
+
                 )
 
             except Exception as e:
+
                 await message.answer(
+
                     f"❌ Не удалось отправить VPN:\n{e}"
+
                 )
 
             del admin_states[user_id]
+
             return
 
     await message.answer(
+
         "Выбери действие в меню 👇",
+
         reply_markup=main_keyboard()
+
     )
 
 
-# =========================
+# =========================================================
 # МОЯ ПОДПИСКА
-# =========================
+# =========================================================
 
-@dp.callback_query(F.data == "my_subscription")
+@dp.callback_query(
+    F.data == "my_subscription"
+)
 async def my_subscription(callback: CallbackQuery):
+
     user_id = callback.from_user.id
 
     sub = subscriptions.get(user_id)
 
     if not sub:
+
         await callback.answer()
+
         await callback.message.answer(
-            "💷 <b>У тебя пока нет активной подписки.</b>\n\n"
+
+            "💷 <b>У тебя пока нет "
+            "активной подписки.</b>\n\n"
+
             "Выбери тариф ниже.",
+
             reply_markup=main_keyboard()
+
         )
+
         return
 
     expires = sub["expires"]
@@ -557,111 +775,181 @@ async def my_subscription(callback: CallbackQuery):
     await callback.answer()
 
     await callback.message.answer(
+
         "💷 <b>Моя подписка</b>\n\n"
+
         f"📦 Тариф: {sub['days']} дней\n"
+
         f"📅 Действует до: "
         f"<b>{expires.strftime('%d.%m.%Y %H:%M')}</b> UTC"
+
     )
 
 
-# =========================
+# =========================================================
 # УСЛОВИЯ
-# =========================
+# =========================================================
 
-@dp.callback_query(F.data == "terms")
+@dp.callback_query(
+    F.data == "terms"
+)
 async def terms_callback(callback: CallbackQuery):
+
     await callback.answer()
 
     await callback.message.answer(
+
         "⚔️ <b>Условия ОтвалиVPN</b>\n\n"
-        "• VPN предоставляется на оплаченный срок.\n"
-        "• После окончания срока доступ прекращается.\n"
-        "• Ссылка предназначена только для покупателя.\n"
-        "• Не передавай VPN-ссылку другим людям.\n"
-        "• При проблемах обращайся в поддержку."
+
+        "• VPN предоставляется "
+        "на оплаченный срок.\n"
+
+        "• После окончания срока "
+        "доступ прекращается.\n"
+
+        "• Ссылка предназначена "
+        "только для покупателя.\n"
+
+        "• Не передавай VPN-ссылку "
+        "другим людям.\n"
+
+        "• При проблемах обращайся "
+        "в поддержку."
+
     )
 
 
-@dp.callback_query(F.data == "support")
+# =========================================================
+# ПОДДЕРЖКА
+# =========================================================
+
+@dp.callback_query(
+    F.data == "support"
+)
 async def support_callback(callback: CallbackQuery):
+
     await callback.answer()
 
     await callback.message.answer(
+
         "🪡 <b>Поддержка</b>\n\n"
-        "Если возникла проблема с оплатой или VPN — "
+
+        "Если возникла проблема "
+        "с оплатой или VPN — "
         "напиши администратору."
+
     )
 
 
-# =========================
-# /MYID
-# =========================
+# =========================================================
+# MYID
+# =========================================================
 
 @dp.message(Command("myid"))
 async def myid(message: Message):
+
     await message.answer(
-        f"🆔 Твой Telegram ID:\n<code>{message.from_user.id}</code>"
+
+        f"🆔 Твой Telegram ID:\n"
+        f"<code>{message.from_user.id}</code>"
+
     )
 
 
-# =========================
-# /TERMS
-# =========================
+# =========================================================
+# TERMS
+# =========================================================
 
 @dp.message(Command("terms"))
 async def terms_command(message: Message):
+
     await message.answer(
+
         "⚔️ <b>Условия ОтвалиVPN</b>\n\n"
-        "VPN предоставляется на оплаченный срок.\n"
-        "Не передавай VPN-ссылку другим людям."
+
+        "VPN предоставляется "
+        "на оплаченный срок.\n"
+
+        "Не передавай VPN-ссылку "
+        "другим людям."
+
     )
 
 
-# =========================
-# /PAY
-# =========================
+# =========================================================
+# PAY
+# =========================================================
 
 @dp.message(Command("pay"))
 async def pay_command(message: Message):
+
     await message.answer(
+
         "Выбери тариф:",
+
         reply_markup=main_keyboard()
+
     )
 
 
-# =========================
-# /GIVEVPN — РЕЗЕРВНЫЙ СПОСОБ
-# =========================
+# =========================================================
+# GIVEVPN
+# =========================================================
 
 @dp.message(Command("givevpn"))
 async def givevpn(message: Message):
+
     if message.from_user.id not in ADMIN_IDS:
-        await message.answer("Нет доступа.")
+
+        await message.answer(
+            "Нет доступа."
+        )
+
         return
 
-    args = message.text.split(maxsplit=2)
+    args = message.text.split(
+        maxsplit=2
+    )
 
     if len(args) < 3:
+
         await message.answer(
+
             "Использование:\n"
-            "<code>/givevpn TELEGRAM_ID VPN_LINK</code>"
+
+            "<code>/givevpn "
+            "TELEGRAM_ID VPN_LINK</code>"
+
         )
+
         return
 
     try:
+
         buyer_id = int(args[1])
+
     except ValueError:
-        await message.answer("❌ Неверный Telegram ID.")
+
+        await message.answer(
+            "❌ Неверный Telegram ID."
+        )
+
         return
 
     vpn_link = args[2].strip()
 
     try:
+
         await bot.send_message(
+
             buyer_id,
+
             "🎉 <b>VPN готов!</b>\n\n"
+
             f"<code>{vpn_link}</code>\n\n"
+
             "Добавь ссылку в HAPP или V2Ray."
+
         )
 
         await message.answer(
@@ -669,48 +957,127 @@ async def givevpn(message: Message):
         )
 
     except Exception as e:
+
         await message.answer(
             f"❌ Ошибка:\n{e}"
         )
 
 
-# =========================
-# WEB SERVER ДЛЯ RAILWAY
-# =========================
+# =========================================================
+# WEB APP HTML
+# =========================================================
 
-async def health(request):
-    return web.Response(
-        text="ОтвалиVPN работает!"
-    )
+def get_webapp_html():
+
+    try:
+
+        with open(
+            "webapp.html",
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            return f.read()
+
+    except FileNotFoundError:
+
+        return None
 
 
-async def start_web_server():
-    app = web.Application()
+# =========================================================
+# HTTP HANDLER
+# =========================================================
 
-    app.router.add_get("/", health)
+async def http_handler(request):
 
-    async def mini_app(request):
-        try:
-            with open("webapp.html", "r", encoding="utf-8") as f:
-                html = f.read()
+    path = request.path
 
-            return web.Response(
-                text=html,
-                content_type="text/html"
-            )
+    if path == "/":
 
-        except FileNotFoundError:
+        return web.Response(
+            text="ОтвалиVPN работает!"
+        )
+
+    if path == "/app":
+
+        html = get_webapp_html()
+
+        if html is None:
+
             return web.Response(
                 text="webapp.html not found",
                 status=404
             )
 
-    app.router.add_get("/app", mini_app)
+        return web.Response(
+            text=html,
+            content_type="text/html"
+        )
 
-    runner = web.AppRunner(app)
+    if path == "/background.png":
+
+        try:
+
+            with open(
+                "background.png",
+                "rb"
+            ) as f:
+
+                data = f.read()
+
+            return web.Response(
+                body=data,
+                content_type="image/png"
+            )
+
+        except FileNotFoundError:
+
+            return web.Response(
+                text="background.png not found",
+                status=404
+            )
+
+    return web.Response(
+        text="404",
+        status=404
+    )
+
+
+# =========================================================
+# AIOHTTP SERVER
+# =========================================================
+
+async def start_web_server():
+
+    app_server = web.Application()
+
+    app_server.router.add_get(
+        "/",
+        http_handler
+    )
+
+    app_server.router.add_get(
+        "/app",
+        http_handler
+    )
+
+    app_server.router.add_get(
+        "/background.png",
+        http_handler
+    )
+
+    runner = web.AppRunner(
+        app_server
+    )
+
     await runner.setup()
 
-    port = int(os.environ.get("PORT", "8080"))
+    port = int(
+        os.environ.get(
+            "PORT",
+            "8080"
+        )
+    )
 
     site = web.TCPSite(
         runner,
@@ -724,50 +1091,398 @@ async def start_web_server():
         f"Web server started on port {port}"
     )
 
+    return runner
 
-# =========================
-# НАСТРОЙКА TELEGRAM
-# =========================
+
+# =========================================================
+# TELEGRAM SETUP
+# =========================================================
 
 async def setup_bot():
+
     await bot.set_my_commands([
+
         ("start", "Запустить ОтвалиVPN"),
+
         ("pay", "Купить VPN"),
+
         ("myid", "Мой Telegram ID"),
+
         ("terms", "Условия"),
+
     ])
 
     await bot.set_chat_menu_button(
+
         menu_button=MenuButtonWebApp(
+
             text="🪡 ОтвалиVPN",
+
             web_app=WebAppInfo(
                 url=WEBAPP_URL
             )
+
         )
+
     )
 
 
-# =========================
-# ЗАПУСК
-# =========================
+# =========================================================
+# POLLING
+# =========================================================
+
+async def bot_runner():
+
+    if not BOT_TOKEN:
+
+        logging.error(
+            "BOT_TOKEN не установлен!"
+        )
+
+        return
+
+    try:
+
+        await setup_bot()
+
+        await bot.delete_webhook(
+            drop_pending_updates=True
+        )
+
+        logging.info(
+            "Telegram bot starting..."
+        )
+
+        await dp.start_polling(
+            bot
+        )
+
+    except asyncio.CancelledError:
+
+        logging.info(
+            "Telegram bot stopped."
+        )
+
+        raise
+
+    except Exception as e:
+
+        logging.exception(
+            f"Ошибка Telegram бота: {e}"
+        )
+
+
+# =========================================================
+# ASGI APP ДЛЯ RAILWAY / UVICORN
+# =========================================================
+
+_bot_task = None
+_web_runner = None
+
+
+async def app(scope, receive, send):
+
+    global _bot_task
+    global _web_runner
+
+    # -----------------------------------------------------
+    # LIFESPAN
+    # -----------------------------------------------------
+
+    if scope["type"] == "lifespan":
+
+        while True:
+
+            event = await receive()
+
+            if event["type"] == "lifespan.startup":
+
+                logging.info(
+                    "ASGI startup"
+                )
+
+                if not BOT_TOKEN:
+
+                    logging.error(
+                        "BOT_TOKEN не найден в Variables."
+                    )
+
+                else:
+
+                    _web_runner = (
+                        await start_web_server()
+                    )
+
+                    _bot_task = asyncio.create_task(
+                        bot_runner()
+                    )
+
+                await send({
+
+                    "type":
+                    "lifespan.startup.complete"
+
+                })
+
+            elif event["type"] == "lifespan.shutdown":
+
+                logging.info(
+                    "ASGI shutdown"
+                )
+
+                if _bot_task:
+
+                    _bot_task.cancel()
+
+                    try:
+
+                        await _bot_task
+
+                    except asyncio.CancelledError:
+
+                        pass
+
+                if _web_runner:
+
+                    await _web_runner.cleanup()
+
+                try:
+
+                    await bot.session.close()
+
+                except Exception:
+
+                    pass
+
+                await send({
+
+                    "type":
+                    "lifespan.shutdown.complete"
+
+                })
+
+                return
+
+    # -----------------------------------------------------
+    # HTTP
+    # -----------------------------------------------------
+
+    if scope["type"] == "http":
+
+        path = scope.get(
+            "path",
+            "/"
+        )
+
+        if path == "/":
+
+            body = (
+                "ОтвалиVPN работает!"
+            ).encode()
+
+            await send({
+
+                "type":
+                "http.response.start",
+
+                "status": 200,
+
+                "headers": [
+                    [
+                        b"content-type",
+                        b"text/plain; charset=utf-8"
+                    ]
+                ],
+
+            })
+
+            await send({
+
+                "type":
+                "http.response.body",
+
+                "body": body
+
+            })
+
+            return
+
+        if path == "/app":
+
+            html = get_webapp_html()
+
+            if html is None:
+
+                body = (
+                    "webapp.html not found"
+                ).encode()
+
+                await send({
+
+                    "type":
+                    "http.response.start",
+
+                    "status": 404,
+
+                    "headers": [
+                        [
+                            b"content-type",
+                            b"text/plain"
+                        ]
+                    ],
+
+                })
+
+                await send({
+
+                    "type":
+                    "http.response.body",
+
+                    "body": body
+
+                })
+
+                return
+
+            body = html.encode(
+                "utf-8"
+            )
+
+            await send({
+
+                "type":
+                "http.response.start",
+
+                "status": 200,
+
+                "headers": [
+                    [
+                        b"content-type",
+                        b"text/html; charset=utf-8"
+                    ]
+                ],
+
+            })
+
+            await send({
+
+                "type":
+                "http.response.body",
+
+                "body": body
+
+            })
+
+            return
+
+        if path == "/background.png":
+
+            try:
+
+                with open(
+                    "background.png",
+                    "rb"
+                ) as f:
+
+                    body = f.read()
+
+                await send({
+
+                    "type":
+                    "http.response.start",
+
+                    "status": 200,
+
+                    "headers": [
+                        [
+                            b"content-type",
+                            b"image/png"
+                        ]
+                    ],
+
+                })
+
+                await send({
+
+                    "type":
+                    "http.response.body",
+
+                    "body": body
+
+                })
+
+                return
+
+            except FileNotFoundError:
+
+                pass
+
+        body = b"Not found"
+
+        await send({
+
+            "type":
+            "http.response.start",
+
+            "status": 404,
+
+            "headers": [
+                [
+                    b"content-type",
+                    b"text/plain"
+                ]
+            ],
+
+        })
+
+        await send({
+
+            "type":
+            "http.response.body",
+
+            "body": body
+
+        })
+
+        return
+
+
+# =========================================================
+# ЗАПУСК ЧЕРЕЗ PYTHON
+# =========================================================
 
 async def main():
+
     logging.basicConfig(
-        level=logging.INFO
+        level=logging.INFO,
+        format="%(asctime)s "
+               "[%(levelname)s] %(message)s"
     )
 
     if not BOT_TOKEN:
+
         raise RuntimeError(
-            "BOT_TOKEN не найден в Railway Variables"
+            "BOT_TOKEN не найден "
+            "в Railway Variables."
         )
 
     await setup_bot()
+
+    await bot.delete_webhook(
+        drop_pending_updates=True
+    )
+
     await start_web_server()
 
-    logging.info("ОтвалиVPN запущен!")
+    logging.info(
+        "ОтвалиVPN запущен!"
+    )
 
-    await dp.start_polling(bot)
+    await dp.start_polling(
+        bot
+    )
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())

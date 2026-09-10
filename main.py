@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import (
@@ -46,7 +47,7 @@ TARIFFS = {
 
 
 # Временное хранилище.
-# Базу данных подключим в самом конце.
+# БД подключим в самом конце.
 subscriptions = {}
 
 
@@ -64,12 +65,56 @@ async def home():
 
 @app.get("/app", response_class=HTMLResponse)
 async def webapp():
+
     with open("webapp.html", "r", encoding="utf-8") as file:
         return file.read()
 
 
 # ============================================================
-# START
+# СОЗДАНИЕ INVOICE ДЛЯ MINI APP
+# ============================================================
+
+class InvoiceRequest(BaseModel):
+    tariff: str
+
+
+@app.post("/create-invoice")
+async def create_invoice(data: InvoiceRequest):
+
+    tariff = TARIFFS.get(data.tariff)
+
+    if not tariff:
+        return {
+            "ok": False,
+            "error": "Тариф не найден"
+        }
+
+    payload = f"vpn_{data.tariff}_days"
+
+    invoice_link = await bot.create_invoice_link(
+        title=f"ОтвалиVPN — {tariff['days']} дней",
+        description=(
+            f"Доступ к ОтвалиVPN "
+            f"на {tariff['days']} дней."
+        ),
+        payload=payload,
+        currency="XTR",
+        prices=[
+            LabeledPrice(
+                label=f"ОтвалиVPN — {tariff['days']} дней",
+                amount=tariff["price"]
+            )
+        ]
+    )
+
+    return {
+        "ok": True,
+        "invoice": invoice_link
+    }
+
+
+# ============================================================
+# TELEGRAM /START
 # ============================================================
 
 @dp.message()
@@ -125,15 +170,11 @@ async def handle_message(message: types.Message):
 
 
 # ============================================================
-# ПОКУПКА ТАРИФА
+# ПОКУПКА И ПОДПИСКА
 # ============================================================
 
 @dp.callback_query()
 async def callbacks(callback: types.CallbackQuery):
-
-    # --------------------------------------------------------
-    # ПОКУПКА
-    # --------------------------------------------------------
 
     if callback.data.startswith("buy_"):
 
@@ -151,8 +192,8 @@ async def callbacks(callback: types.CallbackQuery):
             chat_id=callback.from_user.id,
             title=f"ОтвалиVPN — {tariff['days']} дней",
             description=(
-                f"Доступ к ОтвалиVPN на "
-                f"{tariff['days']} дней."
+                f"Доступ к ОтвалиVPN "
+                f"на {tariff['days']} дней."
             ),
             payload=f"vpn_{tariff_id}_days",
             currency="XTR",
@@ -163,10 +204,6 @@ async def callbacks(callback: types.CallbackQuery):
                 )
             ]
         )
-
-    # --------------------------------------------------------
-    # МОЯ ПОДПИСКА
-    # --------------------------------------------------------
 
     elif callback.data == "subscription":
 
@@ -199,7 +236,7 @@ async def callbacks(callback: types.CallbackQuery):
 
 
 # ============================================================
-# ПРОВЕРКА ПЕРЕД ОПЛАТОЙ
+# PRE-CHECKOUT
 # ============================================================
 
 @dp.pre_checkout_query()
@@ -210,33 +247,42 @@ async def process_pre_checkout(
     payload = pre_checkout_query.invoice_payload
 
     if not payload.startswith("vpn_") or not payload.endswith("_days"):
+
         await pre_checkout_query.answer(
             ok=False,
             error_message="Неизвестный тариф."
         )
         return
 
-    tariff_id = payload.replace("vpn_", "").replace("_days", "")
+    tariff_id = payload.replace(
+        "vpn_", ""
+    ).replace(
+        "_days", ""
+    )
+
     tariff = TARIFFS.get(tariff_id)
 
     if not tariff:
+
         await pre_checkout_query.answer(
             ok=False,
-            error_message="Этот тариф больше недоступен."
+            error_message="Этот тариф недоступен."
         )
         return
 
     if pre_checkout_query.currency != "XTR":
+
         await pre_checkout_query.answer(
             ok=False,
-            error_message="Неверная валюта платежа."
+            error_message="Неверная валюта."
         )
         return
 
     if pre_checkout_query.total_amount != tariff["price"]:
+
         await pre_checkout_query.answer(
             ok=False,
-            error_message="Цена тарифа изменилась. Оформите покупку заново."
+            error_message="Цена тарифа изменилась."
         )
         return
 
@@ -260,13 +306,17 @@ async def process_payment(message: types.Message):
     if not payload.startswith("vpn_") or not payload.endswith("_days"):
         return
 
-    tariff_id = payload.replace("vpn_", "").replace("_days", "")
+    tariff_id = payload.replace(
+        "vpn_", ""
+    ).replace(
+        "_days", ""
+    )
+
     tariff = TARIFFS.get(tariff_id)
 
     if not tariff:
         return
 
-    # Проверяем реальную оплату
     if payment.currency != "XTR":
         return
 
@@ -279,8 +329,6 @@ async def process_payment(message: types.Message):
 
     old_expiration = subscriptions.get(user_id)
 
-    # Если подписка ещё активна —
-    # продлеваем её от старой даты.
     if old_expiration and old_expiration > now:
         start_from = old_expiration
     else:
@@ -292,8 +340,6 @@ async def process_payment(message: types.Message):
 
     subscriptions[user_id] = expiration
 
-    # Сохраняем ID платежа.
-    # В будущем он будет нужен для БД/возвратов.
     payment_id = payment.telegram_payment_charge_id
 
     await message.answer(

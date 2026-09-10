@@ -24,7 +24,7 @@ from aiogram.types import (
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
-# ID второго администратора
+# Второй администратор
 FRIEND_ADMIN_ID = 1404271536
 
 ADMIN_IDS = {
@@ -32,7 +32,7 @@ ADMIN_IDS = {
     FRIEND_ADMIN_ID,
 }
 
-# Реквизиты оплаты берём из Railway Variables
+# Реквизиты оплаты
 PAYMENT_DETAILS = os.getenv(
     "PAYMENT_DETAILS",
     "Реквизиты оплаты не настроены."
@@ -78,14 +78,17 @@ TARIFFS = {
 # ВРЕМЕННОЕ ХРАНИЛИЩЕ
 # =========================================================
 
-# user_id -> информация о подписке
+# user_id -> подписка
 subscriptions = {}
 
-# payment_id -> информация об оплате
+# payment_id -> оплата
 payments = {}
 
 # admin_id -> payment_id
 admin_waiting_vpn = {}
+
+# admin_id -> данные выдачи подарка
+admin_gift_state = {}
 
 
 # =========================================================
@@ -126,37 +129,50 @@ def is_admin(user_id: int) -> bool:
 # ГЛАВНОЕ МЕНЮ
 # =========================================================
 
-def main_keyboard():
+def main_keyboard(user_id: int | None = None):
+
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text="🪡 Купить VPN",
+                callback_data="buy_menu",
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                text="💷 Моя подписка",
+                callback_data="my_subscription",
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                text="⚔️ Условия",
+                callback_data="terms",
+            ),
+
+            InlineKeyboardButton(
+                text="🪡 Поддержка",
+                callback_data="support",
+            ),
+        ],
+    ]
+
+    # Кнопка подарка только для админов
+    if user_id is not None and is_admin(user_id):
+
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="🎁 Выдать подарок",
+                    callback_data="gift_menu",
+                )
+            ]
+        )
 
     return InlineKeyboardMarkup(
-        inline_keyboard=[
-
-            [
-                InlineKeyboardButton(
-                    text="🪡 Купить VPN",
-                    callback_data="buy_menu",
-                )
-            ],
-
-            [
-                InlineKeyboardButton(
-                    text="💷 Моя подписка",
-                    callback_data="my_subscription",
-                )
-            ],
-
-            [
-                InlineKeyboardButton(
-                    text="⚔️ Условия",
-                    callback_data="terms",
-                ),
-
-                InlineKeyboardButton(
-                    text="🪡 Поддержка",
-                    callback_data="support",
-                ),
-            ],
-        ]
+        inline_keyboard=buttons
     )
 
 
@@ -194,6 +210,53 @@ def tariffs_keyboard():
                 InlineKeyboardButton(
                     text="🕊️ 90 дней — 399 руб",
                     callback_data="tariff_90",
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="main_menu",
+                )
+            ],
+        ]
+    )
+
+
+# =========================================================
+# МЕНЮ ПОДАРКА
+# =========================================================
+
+def gift_tariffs_keyboard():
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="🎁 7 дней",
+                    callback_data="gift_tariff_7",
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🎁 14 дней",
+                    callback_data="gift_tariff_14",
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🎁 30 дней",
+                    callback_data="gift_tariff_30",
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🎁 90 дней",
+                    callback_data="gift_tariff_90",
                 )
             ],
 
@@ -296,7 +359,9 @@ async def start(message: Message):
         "🪡 <b>ОТВАЛИVPN</b>\n\n"
         "Быстрый VPN без лишнего.\n\n"
         "Выбирай тариф ниже 👇",
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            message.from_user.id
+        ),
     )
 
 
@@ -418,7 +483,6 @@ async def confirm_purchase(callback: CallbackQuery):
 
         return
 
-    # Проверяем, нет ли уже активной заявки
     existing = None
 
     for payment in payments.values():
@@ -454,14 +518,15 @@ async def confirm_purchase(callback: CallbackQuery):
 
             "Дождись обработки предыдущей заявки.",
 
-            reply_markup=main_keyboard(),
+            reply_markup=main_keyboard(
+                callback.from_user.id
+            ),
         )
 
         await callback.answer()
 
         return
 
-    # Создаём новую оплату
     payment_id = uuid.uuid4().hex[:10].upper()
 
     payments[payment_id] = {
@@ -542,7 +607,6 @@ async def user_paid(callback: CallbackQuery):
 
         return
 
-    # Защита от чужой кнопки
     if payment["user_id"] != callback.from_user.id:
 
         await callback.answer(
@@ -552,7 +616,6 @@ async def user_paid(callback: CallbackQuery):
 
         return
 
-    # Защита от повторного нажатия
     if payment["status"] != "waiting_payment":
 
         await callback.answer(
@@ -581,15 +644,13 @@ async def user_paid(callback: CallbackQuery):
         f"Сумма: "
         f"<b>{payment['price']} руб</b>\n\n"
 
-        "Проверь, чтобы перевод был отправлен "
-        "на правильные реквизиты.\n\n"
-
         "Ожидай подтверждения администратора.",
 
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            callback.from_user.id
+        ),
     )
 
-    # Информация для админов
     username = html.quote(
         payment["username"]
     )
@@ -616,7 +677,6 @@ async def user_paid(callback: CallbackQuery):
         "Проверь перевод в банковском приложении."
     )
 
-    # Отправляем обоим админам
     for admin_id in ADMIN_IDS:
 
         if admin_id <= 0:
@@ -697,7 +757,9 @@ async def cancel_payment(callback: CallbackQuery):
         "Если захочешь купить VPN — "
         "нажми «🪡 Купить VPN».",
 
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            callback.from_user.id
+        ),
     )
 
     await callback.answer()
@@ -756,7 +818,6 @@ async def admin_confirm(callback: CallbackQuery):
         datetime.now(timezone.utc)
     )
 
-    # Запоминаем, какой админ будет вводить VPN
     admin_waiting_vpn[
         callback.from_user.id
     ] = payment_id
@@ -887,19 +948,341 @@ async def admin_reject(callback: CallbackQuery):
 
 
 # =========================================================
-# ПОЛУЧЕНИЕ VPN-ССЫЛКИ ОТ АДМИНА
+# 🎁 МЕНЮ ПОДАРКА
+# =========================================================
+
+@dp.callback_query(F.data == "gift_menu")
+async def gift_menu(callback: CallbackQuery):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
+
+        await callback.answer(
+            "Нет доступа.",
+            show_alert=True,
+        )
+
+        return
+
+    await callback.message.edit_text(
+
+        "🎁 <b>ВЫДАТЬ ПОДАРОК</b>\n\n"
+
+        "Выбери срок VPN:",
+
+        reply_markup=gift_tariffs_keyboard(),
+    )
+
+    await callback.answer()
+
+
+# =========================================================
+# 🎁 ВЫБОР СРОКА ПОДАРКА
+# =========================================================
+
+@dp.callback_query(F.data.startswith("gift_tariff_"))
+async def gift_tariff_selected(
+    callback: CallbackQuery
+):
+
+    if not is_admin(
+        callback.from_user.id
+    ):
+
+        await callback.answer(
+            "Нет доступа.",
+            show_alert=True,
+        )
+
+        return
+
+    try:
+
+        days = int(
+            callback.data.replace(
+                "gift_tariff_",
+                "",
+            )
+        )
+
+    except ValueError:
+
+        await callback.answer(
+            "Ошибка срока.",
+            show_alert=True,
+        )
+
+        return
+
+    tariff = TARIFFS.get(days)
+
+    if not tariff:
+
+        await callback.answer(
+            "Срок не найден.",
+            show_alert=True,
+        )
+
+        return
+
+    # Сохраняем состояние админа
+    admin_gift_state[
+        callback.from_user.id
+    ] = {
+
+        "days": days,
+
+        "stage": "waiting_user_id",
+    }
+
+    await callback.message.edit_text(
+
+        "🎁 <b>ПОДАРОК</b>\n\n"
+
+        f"Срок: <b>{days} дней</b>\n\n"
+
+        "Теперь отправь сюда "
+        "<b>Telegram ID получателя</b>.\n\n"
+
+        "Например:\n"
+        "<code>123456789</code>"
+    )
+
+    await callback.answer()
+
+
+# =========================================================
+# ОБРАБОТКА СООБЩЕНИЙ АДМИНА
 # =========================================================
 
 @dp.message()
-async def admin_vpn_message(message: Message):
+async def admin_messages(message: Message):
 
     user_id = message.from_user.id
 
-    # Если это не админ — ничего не делаем
+    # =====================================================
+    # НЕ АДМИН
+    # =====================================================
+
     if not is_admin(user_id):
         return
 
-    # Проверяем, ждём ли мы от этого админа VPN-ссылку
+    # =====================================================
+    # СНАЧАЛА ПРОВЕРЯЕМ ПОДАРОК
+    # =====================================================
+
+    gift = admin_gift_state.get(user_id)
+
+    if gift:
+
+        # -------------------------------------------------
+        # ЖДЁМ TELEGRAM ID
+        # -------------------------------------------------
+
+        if gift["stage"] == "waiting_user_id":
+
+            text = (
+                message.text or ""
+            ).strip()
+
+            try:
+
+                target_user_id = int(text)
+
+                if target_user_id <= 0:
+                    raise ValueError
+
+            except ValueError:
+
+                await message.answer(
+
+                    "❌ <b>Неверный Telegram ID.</b>\n\n"
+
+                    "Отправь только число.\n\n"
+
+                    "Например:\n"
+                    "<code>123456789</code>"
+                )
+
+                return
+
+            gift["target_user_id"] = (
+                target_user_id
+            )
+
+            gift["stage"] = "waiting_vpn_url"
+
+            await message.answer(
+
+                "✅ Получатель установлен.\n\n"
+
+                f"🆔 ID: "
+                f"<code>{target_user_id}</code>\n"
+
+                f"🎁 Срок: "
+                f"<b>{gift['days']} дней</b>\n\n"
+
+                "Теперь отправь "
+                "<b>subscription URL из 3X-UI</b>."
+            )
+
+            return
+
+        # -------------------------------------------------
+        # ЖДЁМ VPN URL
+        # -------------------------------------------------
+
+        if gift["stage"] == "waiting_vpn_url":
+
+            vpn_url = (
+                message.text or ""
+            ).strip()
+
+            if not (
+                vpn_url.startswith("http://")
+                or vpn_url.startswith("https://")
+            ):
+
+                await message.answer(
+
+                    "❌ <b>Неверная ссылка.</b>\n\n"
+
+                    "Отправь полную "
+                    "subscription-ссылку из 3X-UI."
+                )
+
+                return
+
+            target_user_id = (
+                gift["target_user_id"]
+            )
+
+            days = gift["days"]
+
+            now = datetime.now(
+                timezone.utc
+            )
+
+            expires = now + timedelta(
+                days=days
+            )
+
+            gift_id = (
+                "GIFT-"
+                + uuid.uuid4().hex[:8].upper()
+            )
+
+            # Сохраняем подписку
+            subscriptions[
+                target_user_id
+            ] = {
+
+                "days":
+                    days,
+
+                "price":
+                    0,
+
+                "url":
+                    vpn_url,
+
+                "started_at":
+                    now,
+
+                "expires_at":
+                    expires,
+
+                "payment_id":
+                    gift_id,
+
+                "gift":
+                    True,
+            }
+
+            # Удаляем состояние
+            admin_gift_state.pop(
+                user_id,
+                None,
+            )
+
+            # -------------------------------------------------
+            # ОТПРАВЛЯЕМ ПОДАРОК ПОЛУЧАТЕЛЮ
+            # -------------------------------------------------
+
+            try:
+
+                await bot.send_message(
+
+                    chat_id=target_user_id,
+
+                    text=(
+
+                        "🎁 <b>ТЕБЕ ПОДАРИЛИ VPN!</b>\n\n"
+
+                        f"📦 Срок: "
+                        f"<b>{days} дней</b>\n\n"
+
+                        "⚔️ <b>Твоя subscription-ссылка:</b>\n\n"
+
+                        f"<code>{html.quote(vpn_url)}</code>\n\n"
+
+                        "Добавь эту ссылку в "
+                        "Happ или V2Ray.\n\n"
+
+                        "Приятного пользования ❤️"
+                    ),
+                )
+
+            except Exception as error:
+
+                logger.error(
+                    "Не удалось отправить подарок пользователю %s: %s",
+                    target_user_id,
+                    error,
+                )
+
+                # Удаляем подписку, если доставить её невозможно
+                subscriptions.pop(
+                    target_user_id,
+                    None,
+                )
+
+                await message.answer(
+
+                    "❌ <b>Не удалось отправить подарок.</b>\n\n"
+
+                    f"Telegram ID: "
+                    f"<code>{target_user_id}</code>\n\n"
+
+                    "Возможно, пользователь ещё "
+                    "не запускал бота через /start.\n\n"
+
+                    "Пусть он зайдёт в бота и нажмёт "
+                    "«/start», после чего попробуй снова."
+                )
+
+                return
+
+            await message.answer(
+
+                "🎁 <b>ПОДАРОК ВЫДАН!</b>\n\n"
+
+                f"👤 Получатель: "
+                f"<code>{target_user_id}</code>\n"
+
+                f"📦 Срок: "
+                f"<b>{days} дней</b>\n\n"
+
+                "VPN-ссылка отправлена получателю."
+            )
+
+            return
+
+    # =====================================================
+    # ОПЛАЧЕННАЯ ЗАЯВКА — ЖДЁМ VPN URL
+    # =====================================================
+
     payment_id = admin_waiting_vpn.get(
         user_id
     )
@@ -932,6 +1315,7 @@ async def admin_vpn_message(message: Message):
         )
 
         await message.answer(
+
             "❌ Эта заявка больше "
             "не ожидает VPN."
         )
@@ -942,7 +1326,6 @@ async def admin_vpn_message(message: Message):
         message.text or ""
     ).strip()
 
-    # Проверяем ссылку
     if not (
         vpn_url.startswith("http://")
         or vpn_url.startswith("https://")
@@ -952,13 +1335,12 @@ async def admin_vpn_message(message: Message):
 
             "❌ <b>Неверная ссылка.</b>\n\n"
 
-            "Отправь полную subscription-ссылку "
-            "из 3X-UI."
+            "Отправь полную "
+            "subscription-ссылку из 3X-UI."
         )
 
         return
 
-    # Сохраняем подписку
     now = datetime.now(
         timezone.utc
     )
@@ -999,7 +1381,6 @@ async def admin_vpn_message(message: Message):
         None,
     )
 
-    # Отправляем VPN покупателю
     await bot.send_message(
 
         chat_id=payment["user_id"],
@@ -1055,7 +1436,9 @@ async def my_subscription(
 
             "Активной подписки нет.",
 
-            reply_markup=main_keyboard(),
+            reply_markup=main_keyboard(
+                callback.from_user.id
+            ),
         )
 
         await callback.answer()
@@ -1078,7 +1461,9 @@ async def my_subscription(
 
             "Подписка закончилась.",
 
-            reply_markup=main_keyboard(),
+            reply_markup=main_keyboard(
+                callback.from_user.id
+            ),
         )
 
         await callback.answer()
@@ -1089,9 +1474,16 @@ async def my_subscription(
         "%d.%m.%Y %H:%M"
     )
 
+    gift_text = ""
+
+    if subscription.get("gift"):
+        gift_text = "🎁 <b>Это подарок</b>\n\n"
+
     await callback.message.edit_text(
 
         "💷 <b>МОЯ ПОДПИСКА</b>\n\n"
+
+        f"{gift_text}"
 
         f"📦 Тариф: "
         f"<b>{subscription['days']} дней</b>\n"
@@ -1103,7 +1495,9 @@ async def my_subscription(
 
         f"<code>{html.quote(subscription['url'])}</code>",
 
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            callback.from_user.id
+        ),
     )
 
     await callback.answer()
@@ -1127,10 +1521,15 @@ async def terms(callback: CallbackQuery):
         "После подтверждения оплаты "
         "администратор выдаёт VPN.\n\n"
 
+        "Подарочный VPN также выдаётся "
+        "администратором вручную.\n\n"
+
         "После окончания срока "
         "подписка перестаёт действовать.",
 
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            callback.from_user.id
+        ),
     )
 
     await callback.answer()
@@ -1150,7 +1549,9 @@ async def support(callback: CallbackQuery):
         "Если возникла проблема с оплатой "
         "или VPN — напиши администратору.",
 
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            callback.from_user.id
+        ),
     )
 
     await callback.answer()
@@ -1169,7 +1570,9 @@ async def main_menu(callback: CallbackQuery):
 
         "Выбирай нужное действие 👇",
 
-        reply_markup=main_keyboard(),
+        reply_markup=main_keyboard(
+            callback.from_user.id
+        ),
     )
 
     await callback.answer()

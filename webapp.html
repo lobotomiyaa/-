@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -16,72 +18,112 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
+
         * {
             box-sizing: border-box;
         }
 
         html,
         body {
+
             margin: 0;
             padding: 0;
+
             width: 100%;
             min-height: 100%;
+
             font-family: Arial, sans-serif;
+
             background: #050505;
             color: white;
         }
 
         body {
+
             min-height: 100vh;
+
             background:
+
                 linear-gradient(
                     rgba(0,0,0,.78),
                     rgba(0,0,0,.90)
                 ),
+
                 url("background.png");
 
             background-size: cover;
+
             background-position: center;
+
             background-attachment: fixed;
         }
 
         .page {
+
             min-height: 100vh;
-            padding: 30px 18px 20px;
+
+            padding:
+                30px
+                18px
+                20px;
+
             display: flex;
+
             flex-direction: column;
         }
 
         .title {
+
             font-size: 42px;
+
             font-weight: 900;
+
             letter-spacing: -2px;
+
             margin-bottom: 4px;
         }
 
         .subtitle {
+
             color: #aaa;
+
             font-size: 15px;
+
             margin-bottom: 30px;
         }
 
         .tariffs {
+
             display: flex;
+
             flex-direction: column;
+
             gap: 15px;
         }
 
         .tariff {
+
             position: relative;
+
             width: 100%;
-            padding: 20px 18px;
-            border: 2px solid #fff;
+
+            padding:
+                20px
+                18px;
+
+            border:
+                2px solid #fff;
+
             background: #080808;
+
             color: white;
+
             text-align: left;
+
             cursor: pointer;
 
-            transform: rotate(-0.7deg);
+            transform:
+                rotate(-0.7deg);
 
             box-shadow:
                 5px 5px 0 #fff;
@@ -90,18 +132,25 @@
         }
 
         .tariff:nth-child(2) {
-            transform: rotate(.6deg);
+
+            transform:
+                rotate(.6deg);
         }
 
         .tariff:nth-child(3) {
-            transform: rotate(-.4deg);
+
+            transform:
+                rotate(-.4deg);
         }
 
         .tariff:nth-child(4) {
-            transform: rotate(.5deg);
+
+            transform:
+                rotate(.5deg);
         }
 
         .tariff:active {
+
             transform:
                 translate(4px, 4px)
                 rotate(0deg);
@@ -110,68 +159,100 @@
         }
 
         .days {
+
             font-size: 22px;
+
             font-weight: 900;
         }
 
         .price {
+
             margin-top: 5px;
+
             font-size: 31px;
+
             font-weight: 900;
         }
 
         .small {
+
             margin-top: 7px;
+
             color: #888;
+
             font-size: 13px;
         }
 
         .info {
+
             margin-top: 30px;
+
             padding: 18px;
-            border: 1px solid #333;
-            background: rgba(0,0,0,.75);
+
+            border:
+                1px solid #333;
+
+            background:
+                rgba(0,0,0,.75);
         }
 
         .info-title {
+
             font-weight: 900;
+
             margin-bottom: 8px;
         }
 
         .info-text {
+
             color: #aaa;
+
             font-size: 14px;
+
             line-height: 1.5;
         }
 
         footer {
+
             margin-top: auto;
+
             padding-top: 40px;
+
             text-align: center;
+
             color: #555;
+
             font-size: 11px;
         }
+
     </style>
+
 </head>
+
 
 <body>
 
 <div class="page">
 
+
     <div class="title">
         ОтвалиVPN
     </div>
+
 
     <div class="subtitle">
         VPN без лишнего гемора.
     </div>
 
+
     <div class="tariffs">
+
 
         <button
             class="tariff"
             onclick="buy(7)"
         >
+
             <div class="days">
                 7 ДНЕЙ
             </div>
@@ -183,6 +264,7 @@
             <div class="small">
                 Быстрый тест
             </div>
+
         </button>
 
 
@@ -190,6 +272,7 @@
             class="tariff"
             onclick="buy(14)"
         >
+
             <div class="days">
                 14 ДНЕЙ
             </div>
@@ -201,6 +284,7 @@
             <div class="small">
                 Выгодный вариант
             </div>
+
         </button>
 
 
@@ -208,6 +292,7 @@
             class="tariff"
             onclick="buy(30)"
         >
+
             <div class="days">
                 30 ДНЕЙ
             </div>
@@ -219,6 +304,7 @@
             <div class="small">
                 Оптимальный вариант
             </div>
+
         </button>
 
 
@@ -226,6 +312,7 @@
             class="tariff"
             onclick="buy(90)"
         >
+
             <div class="days">
                 90 ДНЕЙ
             </div>
@@ -237,7 +324,9 @@
             <div class="small">
                 Максимальный срок
             </div>
+
         </button>
+
 
     </div>
 
@@ -249,9 +338,12 @@
         </div>
 
         <div class="info-text">
+
             Выбери срок → получи реквизиты →
             переведи нужную сумму → нажми
-            «Я оплатил» → после проверки получишь VPN.
+            «Я оплатил» → после проверки
+            получишь VPN.
+
         </div>
 
     </div>
@@ -261,28 +353,38 @@
         created by lobotomiya or hackentik
     </footer>
 
+
 </div>
 
 
 <script>
 
-    const tg = window.Telegram.WebApp;
+    const tg =
+        window.Telegram.WebApp;
 
     tg.ready();
+
     tg.expand();
 
 
     function buy(days) {
 
-        tg.sendData("buy:" + days);
+        tg.sendData(
+            "buy:" + days
+        );
 
-        setTimeout(() => {
-            tg.close();
-        }, 200);
+        setTimeout(
+            () => {
+                tg.close();
+            },
+            200
+        );
 
     }
 
 </script>
 
+
 </body>
+
 </html>

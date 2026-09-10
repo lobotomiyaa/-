@@ -2,6 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
@@ -18,81 +19,86 @@
 
         body {
             margin: 0;
-            padding: 0;
             background: #090909;
-            color: #ffffff;
+            color: white;
             font-family: Arial, sans-serif;
         }
 
         .container {
-            padding: 24px 18px 30px;
-            max-width: 500px;
+            max-width: 520px;
             margin: auto;
+            padding: 24px 18px 40px;
         }
 
         .logo {
             text-align: center;
-            font-size: 48px;
-            margin-top: 20px;
+            font-size: 52px;
+            margin-top: 10px;
         }
 
         h1 {
             text-align: center;
-            margin: 10px 0 5px;
             font-size: 30px;
+            margin: 8px 0;
         }
 
         .subtitle {
             text-align: center;
-            color: #999;
-            margin-bottom: 30px;
+            color: #8d8d8d;
+            margin-bottom: 28px;
         }
 
-        .status {
+        .card {
             background: #151515;
-            border-radius: 18px;
-            padding: 20px;
-            margin-bottom: 16px;
-            border: 1px solid #292929;
+            border: 1px solid #282828;
+            border-radius: 20px;
+            padding: 19px;
+            margin-bottom: 14px;
         }
 
-        .status-title {
-            color: #aaa;
-            font-size: 14px;
-            margin-bottom: 8px;
+        .label {
+            color: #858585;
+            font-size: 13px;
+            margin-bottom: 7px;
         }
 
-        .status-value {
+        .value {
             font-size: 20px;
             font-weight: bold;
         }
 
         .online {
-            color: #52d273;
+            color: #55d878;
         }
 
         .section-title {
-            font-size: 20px;
+            font-size: 21px;
             font-weight: bold;
-            margin: 25px 0 12px;
+            margin: 28px 0 14px;
         }
 
         .tariff {
             background: #151515;
             border: 1px solid #292929;
-            border-radius: 18px;
-            padding: 18px;
-            margin-bottom: 12px;
+            border-radius: 20px;
+            padding: 19px;
+            margin-bottom: 13px;
         }
 
         .tariff-name {
-            font-size: 19px;
+            font-size: 20px;
             font-weight: bold;
         }
 
-        .tariff-price {
-            color: #aaa;
-            margin-top: 5px;
+        .tariff-description {
+            color: #888;
+            margin-top: 7px;
+            font-size: 14px;
+        }
+
+        .price {
+            font-size: 18px;
+            margin-top: 12px;
         }
 
         button {
@@ -100,18 +106,19 @@
             border: 0;
             border-radius: 14px;
             padding: 15px;
-            margin-top: 13px;
-            background: #ffffff;
-            color: #000000;
+            margin-top: 14px;
+            background: white;
+            color: black;
             font-size: 16px;
             font-weight: bold;
         }
 
-        .footer {
+        .info {
             text-align: center;
-            color: #666;
+            color: #707070;
             font-size: 13px;
-            margin-top: 30px;
+            line-height: 1.5;
+            margin-top: 28px;
         }
     </style>
 </head>
@@ -125,86 +132,131 @@
     <h1>ОтвалиVPN</h1>
 
     <div class="subtitle">
-        ❄ Быстрый. Простой. Приватный.
+        ❄ Быстрый и простой VPN
     </div>
 
-    <div class="status">
-        <div class="status-title">Статус VPN</div>
-        <div class="status-value online">
-            ● Доступен
+
+    <div class="card">
+
+        <div class="label">
+            Состояние сервиса
         </div>
+
+        <div class="value online">
+            ● Сервис работает
+        </div>
+
     </div>
 
-    <div class="status">
-        <div class="status-title">Текущая подписка</div>
-        <div class="status-value">
+
+    <div class="card">
+
+        <div class="label">
+            Моя подписка
+        </div>
+
+        <div class="value">
             Нет активной подписки
         </div>
+
     </div>
+
 
     <div class="section-title">
-        🗡 Тарифы
+        🗡 Выберите тариф
     </div>
 
+
     <div class="tariff">
+
         <div class="tariff-name">
             🪡 7 дней
         </div>
 
-        <div class="tariff-price">
-            99 ⭐
+        <div class="tariff-description">
+            Отличный вариант для проверки VPN
+        </div>
+
+        <div class="price">
+            <b>59 ⭐</b>
         </div>
 
         <button onclick="buy(7)">
-            Купить
+            Купить за 59 ⭐
         </button>
+
     </div>
 
+
     <div class="tariff">
+
         <div class="tariff-name">
-            🧶 30 дней
+            ❄ 30 дней
         </div>
 
-        <div class="tariff-price">
-            299 ⭐
+        <div class="tariff-description">
+            Месячная подписка
+        </div>
+
+        <div class="price">
+            <b>129 ⭐</b>
         </div>
 
         <button onclick="buy(30)">
-            Купить
+            Купить за 129 ⭐
         </button>
+
     </div>
 
+
     <div class="tariff">
+
         <div class="tariff-name">
-            ❄ 90 дней
+            🧶 90 дней
         </div>
 
-        <div class="tariff-price">
-            699 ⭐
+        <div class="tariff-description">
+            Выгодная подписка на 3 месяца
+        </div>
+
+        <div class="price">
+            <b>399 ⭐</b>
         </div>
 
         <button onclick="buy(90)">
-            Купить
+            Купить за 399 ⭐
         </button>
+
     </div>
 
-    <div class="footer">
-        ОтвалиVPN 🪦
+
+    <div class="info">
+        ⭐ Оплата производится через Telegram Stars.<br>
+        После оплаты доступ будет активирован автоматически.
     </div>
 
 </div>
 
+
 <script>
+
     const tg = window.Telegram.WebApp;
 
     tg.ready();
     tg.expand();
 
+
     function buy(days) {
+
         tg.showAlert(
-            "Тариф на " + days + " дней выбран.\n\nОплату подключим следующим этапом ⭐"
+            "Вы выбрали тариф на " +
+            days +
+            " дней.\n\n" +
+            "Сейчас подключаем оплату."
         );
+
     }
+
 </script>
 
 </body>

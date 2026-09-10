@@ -119,7 +119,42 @@ async def create_invoice(data: InvoiceRequest):
 
 @dp.message()
 async def handle_message(message: types.Message):
+    if message.text == "/terms":
 
+        await message.answer(
+            "📜 <b>Условия использования ОтвалиVPN</b>\n\n"
+            "1. После успешной оплаты пользователь получает "
+            "доступ к VPN на выбранный срок.\n\n"
+            "2. Срок подписки начинается после успешного "
+            "завершения оплаты.\n\n"
+            "3. Не передавайте данные доступа другим людям.\n\n"
+            "4. При возникновении проблем с оплатой или "
+            "доступом обратитесь в поддержку через /paysupport.\n\n"
+            "5. Использование VPN должно соответствовать "
+            "законодательству вашей страны.\n\n"
+            "🪦 ОтвалиVPN",
+            parse_mode="HTML"
+        )
+
+        return
+
+
+    if message.text == "/paysupport":
+
+        await message.answer(
+            "🛠 <b>Поддержка ОтвалиVPN</b>\n\n"
+            "Если проблема связана с оплатой, подпиской "
+            "или доступом к VPN — напишите в поддержку.\n\n"
+            "Укажите:\n"
+            "• ваш Telegram username;\n"
+            "• какой тариф покупали;\n"
+            "• описание проблемы;\n"
+            "• если есть — данные платежа.\n\n"
+            "🪦 ОтвалиVPN",
+            parse_mode="HTML"
+        )
+
+        return
     if message.text == "/start":
 
         keyboard = InlineKeyboardMarkup(

@@ -23,8 +23,6 @@ from aiogram.types import (
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
-# Твой Telegram ID.
-# Он уже должен быть добавлен в Railway Variables.
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 
 WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
@@ -63,18 +61,121 @@ TARIFFS = {
 # ============================================================
 # ВРЕМЕННОЕ ХРАНИЛИЩЕ
 #
-# БД НЕ НУЖНА.
-#
-# 3X-UI сама хранит VPN-клиента и срок его действия.
-# Здесь мы временно храним данные, которые нужны боту.
+# Реальный срок VPN хранится в 3X-UI.
+# Здесь бот временно хранит информацию для интерфейса.
 # ============================================================
 
 subscriptions = {}
-
 vpn_links = {}
+subscription_tariffs = {}
 
-# Состояние администратора при выдаче VPN
 admin_states = {}
+
+
+# ============================================================
+# КЛАВИАТУРЫ
+# ============================================================
+
+def main_keyboard():
+
+    return InlineKeyboardMarkup(
+
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="❄ Открыть ОтвалиVPN",
+                    web_app=WebAppInfo(
+                        url=WEBAPP_URL
+                    )
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🪡 7 дней — 59 ⭐",
+                    callback_data="buy_7"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="❄ 30 дней — 129 ⭐",
+                    callback_data="buy_30"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🧶 90 дней — 399 ⭐",
+                    callback_data="buy_90"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🪦 Моя подписка",
+                    callback_data="subscription"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="📜 Условия",
+                    callback_data="terms"
+                ),
+
+                InlineKeyboardButton(
+                    text="🛠 Поддержка",
+                    callback_data="support"
+                )
+            ]
+
+        ]
+    )
+
+
+def back_keyboard():
+
+    return InlineKeyboardMarkup(
+
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="❄ Главное меню",
+                    callback_data="main_menu"
+                )
+            ]
+
+        ]
+    )
+
+
+def subscription_keyboard():
+
+    return InlineKeyboardMarkup(
+
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="❄ Купить / продлить VPN",
+                    web_app=WebAppInfo(
+                        url=WEBAPP_URL
+                    )
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="❄ Главное меню",
+                    callback_data="main_menu"
+                )
+            ]
+
+        ]
+    )
 
 
 # ============================================================
@@ -207,8 +308,6 @@ async def handle_message(message: types.Message):
         )
 
 
-        # Если подписка ещё действует,
-        # продлеваем от её текущего окончания.
         if (
             old_expiration
             and old_expiration > now
@@ -229,10 +328,7 @@ async def handle_message(message: types.Message):
 
         subscriptions[user_id] = expiration
 
-
-        payment_id = (
-            payment.telegram_payment_charge_id
-        )
+        subscription_tariffs[user_id] = tariff_id
 
 
         # ----------------------------------------------------
@@ -246,15 +342,16 @@ async def handle_message(message: types.Message):
             f"{tariff['name']}\n"
             f"💫 Оплачено: {tariff['price']} ⭐\n\n"
 
-            "🟢 Подписка активирована.\n"
+            "🟢 <b>Подписка активирована.</b>\n"
 
             f"📅 Действует до: "
             f"{expiration.strftime('%d.%m.%Y')}\n\n"
 
-            "🪦 <b>VPN сейчас выдаётся.</b>\n\n"
+            "🪦 <b>Теперь выдаём VPN.</b>\n\n"
 
             "Как только VPN будет готов, "
-            "ссылка придёт сюда автоматически.",
+            "ссылка автоматически придёт "
+            "в этот чат.",
 
             parse_mode="HTML"
         )
@@ -290,6 +387,7 @@ async def handle_message(message: types.Message):
                         callback_data=f"admin_give_{user_id}"
                     )
                 ]
+
             ]
         )
 
@@ -345,75 +443,18 @@ async def handle_message(message: types.Message):
 
     if text == "/start":
 
-        keyboard = InlineKeyboardMarkup(
-
-            inline_keyboard=[
-
-                [
-                    InlineKeyboardButton(
-                        text="❄ Открыть ОтвалиVPN",
-                        web_app=WebAppInfo(
-                            url=WEBAPP_URL
-                        )
-                    )
-                ],
-
-                [
-                    InlineKeyboardButton(
-                        text="🪡 7 дней — 59 ⭐",
-                        callback_data="buy_7"
-                    )
-                ],
-
-                [
-                    InlineKeyboardButton(
-                        text="❄ 30 дней — 129 ⭐",
-                        callback_data="buy_30"
-                    )
-                ],
-
-                [
-                    InlineKeyboardButton(
-                        text="🧶 90 дней — 399 ⭐",
-                        callback_data="buy_90"
-                    )
-                ],
-
-                [
-                    InlineKeyboardButton(
-                        text="🪦 Моя подписка",
-                        callback_data="subscription"
-                    )
-                ],
-
-                [
-                    InlineKeyboardButton(
-                        text="📜 Условия",
-                        callback_data="terms"
-                    ),
-
-                    InlineKeyboardButton(
-                        text="🛠 Поддержка",
-                        callback_data="support"
-                    )
-                ]
-            ]
-        )
-
-
         await message.answer(
 
-            "👋 Добро пожаловать "
-            "в <b>ОтвалиVPN</b>!\n\n"
+            "👋 <b>Добро пожаловать в ОтвалиVPN!</b>\n\n"
 
             "❄ Быстрый и простой VPN\n"
             "🗡 Защищённое соединение\n"
-            "🧶 Удобное подключение\n"
+            "🧶 Простое подключение\n"
             "🪦 Без лишних сложностей\n\n"
 
-            "Выбери действие:",
+            "Выбери тариф или открой приложение:",
 
-            reply_markup=keyboard,
+            reply_markup=main_keyboard(),
 
             parse_mode="HTML"
         )
@@ -440,7 +481,6 @@ async def handle_message(message: types.Message):
 
     # ========================================================
     # /GIVEVPN
-    # Оставляем старую команду как запасной вариант.
     # ========================================================
 
     if text == "/givevpn":
@@ -492,7 +532,7 @@ async def handle_message(message: types.Message):
 
 
     # ========================================================
-    # СТАРАЯ РУЧНАЯ ВЫДАЧА
+    # РУЧНАЯ ВЫДАЧА VPN
     # ========================================================
 
     if user_id == ADMIN_ID:
@@ -503,7 +543,7 @@ async def handle_message(message: types.Message):
         if state:
 
             # ------------------------------------------------
-            # ВВОД TELEGRAM ID
+            # TELEGRAM ID
             # ------------------------------------------------
 
             if state["step"] == "user_id":
@@ -536,7 +576,7 @@ async def handle_message(message: types.Message):
 
                     "🔗 <b>Теперь нужна VPN-ссылка.</b>\n\n"
 
-                    "Зайди в 3X-UI, создай клиента "
+                    "Создай клиента в 3X-UI "
                     "и скопируй его subscription-ссылку.\n\n"
 
                     "Отправь ссылку сюда.\n\n"
@@ -550,7 +590,7 @@ async def handle_message(message: types.Message):
 
 
             # ------------------------------------------------
-            # ВВОД VPN ССЫЛКИ
+            # VPN LINK
             # ------------------------------------------------
 
             if state["step"] == "vpn_link":
@@ -640,7 +680,7 @@ async def handle_message(message: types.Message):
 
                             f"<code>{vpn_link}</code>\n\n"
 
-                            "📱 <b>Как подключиться:</b>\n"
+                            "📱 <b>Как подключиться:</b>\n\n"
 
                             "1. Скопируй ссылку.\n"
                             "2. Открой Happ.\n"
@@ -648,9 +688,12 @@ async def handle_message(message: types.Message):
                             "4. Обнови подписку.\n"
                             "5. Подключись.\n\n"
 
-                            "🗡 Не передавай эту ссылку другим людям."
+                            "🗡 <b>Не передавай эту ссылку "
+                            "другим людям.</b>"
 
                         ),
+
+                        reply_markup=subscription_keyboard(),
 
                         parse_mode="HTML"
                     )
@@ -685,6 +728,32 @@ async def callbacks(
 ):
 
     data = callback.data or ""
+
+
+    # ========================================================
+    # ГЛАВНОЕ МЕНЮ
+    # ========================================================
+
+    if data == "main_menu":
+
+        await callback.message.answer(
+
+            "🪦 <b>ОтвалиVPN</b>\n\n"
+
+            "❄ Быстрый и простой VPN\n"
+            "🗡 Защищённое соединение\n"
+            "🧶 Простое подключение\n\n"
+
+            "Выбери действие:",
+
+            reply_markup=main_keyboard(),
+
+            parse_mode="HTML"
+        )
+
+        await callback.answer()
+
+        return
 
 
     # ========================================================
@@ -729,7 +798,7 @@ async def callbacks(
             f"👤 Пользователь:\n"
             f"<code>{target_user_id}</code>\n\n"
 
-            "Теперь создай клиента в 3X-UI "
+            "Создай клиента в 3X-UI "
             "и отправь сюда его "
             "<b>subscription-ссылку</b>.\n\n"
 
@@ -825,31 +894,51 @@ async def callbacks(
             user_id
         )
 
+        tariff_id = subscription_tariffs.get(
+            user_id
+        )
+
+        tariff = TARIFFS.get(
+            tariff_id
+        ) if tariff_id else None
+
+
+        now = datetime.now(timezone.utc)
+
 
         if (
             expiration
-            and expiration >
-            datetime.now(timezone.utc)
+            and expiration > now
         ):
 
-            remaining = (
-                expiration -
-                datetime.now(timezone.utc)
+            remaining = expiration - now
+
+            days_left = max(
+                1,
+                (remaining.total_seconds() + 86399)
+                // 86400
             )
 
-            days_left = remaining.days
+            tariff_name = (
+                tariff["name"]
+                if tariff
+                else "VPN"
+            )
 
 
             text = (
 
                 "🪦 <b>Моя подписка</b>\n\n"
 
-                "🟢 Статус: активна\n"
+                "🟢 <b>Статус:</b> активна\n"
 
-                f"⏱ Осталось: "
+                f"📦 <b>Тариф:</b> "
+                f"{tariff_name}\n"
+
+                f"⏱ <b>Осталось:</b> "
                 f"{days_left} дней\n"
 
-                f"📅 До: "
+                f"📅 <b>До:</b> "
                 f"{expiration.strftime('%d.%m.%Y')}\n\n"
             )
 
@@ -862,21 +951,29 @@ async def callbacks(
 
                     f"<code>{vpn_link}</code>\n\n"
 
-                    "📱 Добавь ссылку в Happ."
+                    "📱 Скопируй ссылку и добавь "
+                    "её в Happ.\n\n"
+
+                    "🗡 Не передавай ссылку другим."
                 )
 
             else:
 
                 text += (
 
-                    "⏳ VPN-ссылка ещё "
-                    "выдаётся вручную."
+                    "⏳ <b>VPN ещё выдаётся.</b>\n\n"
+
+                    "Мы получили оплату. "
+                    "Как только ссылка будет готова, "
+                    "она придёт сюда автоматически."
                 )
 
 
             await callback.message.answer(
 
                 text,
+
+                reply_markup=subscription_keyboard(),
 
                 parse_mode="HTML"
             )
@@ -888,9 +985,12 @@ async def callbacks(
 
                 "🪦 <b>Моя подписка</b>\n\n"
 
-                "🔴 Активной подписки нет.\n\n"
+                "🔴 <b>Активной подписки нет.</b>\n\n"
 
-                "Выбери тариф выше.",
+                "Выбери тариф, чтобы подключить "
+                "ОтвалиVPN.",
+
+                reply_markup=main_keyboard(),
 
                 parse_mode="HTML"
             )
@@ -915,17 +1015,19 @@ async def callbacks(
             "После успешной оплаты пользователь "
             "получает доступ к VPN на выбранный срок.\n\n"
 
-            "Срок подписки начинается после "
+            "⏱ Срок подписки начинается после "
             "успешного завершения оплаты.\n\n"
 
-            "Не передавайте данные доступа "
+            "🗡 Данные доступа нельзя передавать "
             "другим людям.\n\n"
 
-            "Использование VPN должно соответствовать "
+            "⚖️ Использование VPN должно соответствовать "
             "законодательству вашей страны.\n\n"
 
-            "По вопросам оплаты и доступа "
+            "🛠 По вопросам оплаты и доступа "
             "обращайтесь в поддержку.",
+
+            reply_markup=back_keyboard(),
 
             parse_mode="HTML"
         )
@@ -946,15 +1048,21 @@ async def callbacks(
 
             "🛠 <b>Поддержка ОтвалиVPN</b>\n\n"
 
-            "Если возникла проблема с оплатой, "
-            "подпиской или VPN-доступом — "
-            "напишите в поддержку.\n\n"
+            "Возникла проблема? Не переживай.\n\n"
 
-            "Укажите:\n"
-            "• ваш Telegram username;\n"
-            "• тариф;\n"
-            "• описание проблемы;\n"
-            "• информацию о платеже, если она есть.",
+            "Напиши в поддержку и укажи:\n\n"
+
+            "• 👤 Telegram username или ID\n"
+            "• 📦 купленный тариф\n"
+            "• ❌ что именно не работает\n"
+            "• 💫 информацию об оплате, "
+            "если проблема связана с платежом\n\n"
+
+            "🪦 Если VPN оплачен, но ссылка "
+            "не пришла — мы проверим оплату "
+            "и выдадим доступ вручную.",
+
+            reply_markup=back_keyboard(),
 
             parse_mode="HTML"
         )
@@ -1084,17 +1192,19 @@ async def terms_command(
         "После успешной оплаты пользователь "
         "получает доступ к VPN на выбранный срок.\n\n"
 
-        "Срок подписки начинается после "
+        "⏱ Срок подписки начинается после "
         "успешного завершения оплаты.\n\n"
 
-        "Не передавайте данные доступа "
+        "🗡 Данные доступа нельзя передавать "
         "другим людям.\n\n"
 
-        "Использование VPN должно соответствовать "
+        "⚖️ Использование VPN должно соответствовать "
         "законодательству вашей страны.\n\n"
 
-        "По вопросам оплаты и доступа "
+        "🛠 По вопросам оплаты и доступа "
         "обращайтесь в поддержку.",
+
+        reply_markup=back_keyboard(),
 
         parse_mode="HTML"
     )
@@ -1116,15 +1226,22 @@ async def paysupport_command(
 
         "🛠 <b>Поддержка ОтвалиVPN</b>\n\n"
 
-        "Если возникла проблема с оплатой, "
-        "подпиской или VPN-доступом — "
-        "напишите в поддержку.\n\n"
+        "Возникла проблема с оплатой, "
+        "подпиской или VPN?\n\n"
 
-        "Укажите:\n"
-        "• ваш Telegram username;\n"
-        "• тариф;\n"
-        "• описание проблемы;\n"
-        "• информацию о платеже, если она есть.",
+        "Напиши в поддержку и укажи:\n\n"
+
+        "• 👤 Telegram username или ID\n"
+        "• 📦 купленный тариф\n"
+        "• ❌ описание проблемы\n"
+        "• 💫 информацию о платеже, "
+        "если она есть\n\n"
+
+        "🪦 Если VPN оплачен, но ссылка "
+        "не пришла — мы проверим оплату "
+        "и выдадим доступ вручную.",
+
+        reply_markup=back_keyboard(),
 
         parse_mode="HTML"
     )

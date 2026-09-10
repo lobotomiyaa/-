@@ -10,7 +10,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     WebAppInfo
 )
-
+from aiogram.types import LabeledPrice
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
 WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
@@ -46,7 +46,12 @@ async def handle_message(message: types.Message):
                         text="❄ Открыть ОтвалиVPN",
                         web_app=WebAppInfo(url=WEBAPP_URL)
                     )
-                ],
+                ], [
+    InlineKeyboardButton(
+        text="⭐ Купить 30 дней — 299",
+        callback_data="buy_30"
+    )
+],
                 [
                     InlineKeyboardButton(
                         text="🪡 Моя подписка",
@@ -76,6 +81,21 @@ async def callbacks(callback: types.CallbackQuery):
             "🪦 <b>Моя подписка</b>\n\n"
             "У тебя пока нет активной подписки.",
             parse_mode="HTML"
+        )
+
+    elif callback.data == "buy_30":
+        await bot.send_invoice(
+            chat_id=callback.from_user.id,
+            title="ОтвалиVPN — 30 дней",
+            description="Доступ к ОтвалиVPN на 30 дней.",
+            payload="vpn_30_days",
+            currency="XTR",
+            prices=[
+                LabeledPrice(
+                    label="ОтвалиVPN — 30 дней",
+                    amount=299
+                )
+            ]
         )
 
     await callback.answer()

@@ -23,7 +23,14 @@ from aiogram.types import (
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
+# Твой основной ID берётся из Railway
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
+
+# Дополнительные администраторы
+ADMIN_IDS = {
+    ADMIN_ID,
+    1404271536,
+}
 
 WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
 
@@ -357,7 +364,7 @@ async def handle_message(message: types.Message):
 
 
         # ----------------------------------------------------
-        # ИНФОРМАЦИЯ ДЛЯ АДМИНА
+        # ИНФОРМАЦИЯ ДЛЯ АДМИНОВ
         # ----------------------------------------------------
 
         username = message.from_user.username
@@ -391,46 +398,55 @@ async def handle_message(message: types.Message):
         )
 
 
-        try:
+        admin_text = (
 
-            await bot.send_message(
+            "💰 <b>НОВАЯ ПОКУПКА</b>\n\n"
 
-                chat_id=ADMIN_ID,
+            f"👤 Пользователь: "
+            f"{user_display}\n"
 
-                text=(
+            f"🆔 Telegram ID: "
+            f"<code>{user_id}</code>\n\n"
 
-                    "💰 <b>НОВАЯ ПОКУПКА</b>\n\n"
+            f"📦 Тариф: "
+            f"{tariff['name']}\n"
 
-                    f"👤 Пользователь: "
-                    f"{user_display}\n"
+            f"💫 Оплачено: "
+            f"{tariff['price']} ⭐\n\n"
 
-                    f"🆔 Telegram ID: "
-                    f"<code>{user_id}</code>\n\n"
+            f"📅 Действует до: "
+            f"{expiration.strftime('%d.%m.%Y')}\n\n"
 
-                    f"📦 Тариф: "
-                    f"{tariff['name']}\n"
+            "⚠️ <b>Нужно выдать VPN.</b>"
+        )
 
-                    f"💫 Оплачено: "
-                    f"{tariff['price']} ⭐\n\n"
 
-                    f"📅 Действует до: "
-                    f"{expiration.strftime('%d.%m.%Y')}\n\n"
+        # Отправляем уведомление ВСЕМ администраторам
+        for admin_id in ADMIN_IDS:
 
-                    "⚠️ <b>Нужно выдать VPN.</b>"
+            if admin_id == 0:
+                continue
 
-                ),
+            try:
 
-                reply_markup=admin_keyboard,
+                await bot.send_message(
 
-                parse_mode="HTML"
-            )
+                    chat_id=admin_id,
 
-        except Exception as error:
+                    text=admin_text,
 
-            print(
-                "Ошибка отправки уведомления админу:",
-                error
-            )
+                    reply_markup=admin_keyboard,
+
+                    parse_mode="HTML"
+                )
+
+            except Exception as error:
+
+                print(
+                    f"Ошибка отправки уведомления админу "
+                    f"{admin_id}:",
+                    error
+                )
 
 
         return
@@ -484,7 +500,7 @@ async def handle_message(message: types.Message):
 
     if text == "/givevpn":
 
-        if user_id != ADMIN_ID:
+        if user_id not in ADMIN_IDS:
 
             await message.answer(
                 "⛔ У тебя нет доступа к этой команде."
@@ -534,7 +550,7 @@ async def handle_message(message: types.Message):
     # РУЧНАЯ ВЫДАЧА VPN
     # ========================================================
 
-    if user_id == ADMIN_ID:
+    if user_id in ADMIN_IDS:
 
         state = admin_states.get(user_id)
 
@@ -762,7 +778,7 @@ async def callbacks(
 
     if data.startswith("admin_give_"):
 
-        if callback.from_user.id != ADMIN_ID:
+        if callback.from_user.id not in ADMIN_IDS:
 
             await callback.answer(
                 "⛔ Нет доступа.",

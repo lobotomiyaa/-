@@ -4,25 +4,25 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher, F, html
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     Message,
     CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    DefaultBotProperties,
     BotCommand,
 )
-from aiogram.enums import ParseMode
 
 
 # =========================================================
 # НАСТРОЙКИ
 # =========================================================
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 # ID второго администратора
 FRIEND_ADMIN_ID = 1404271536
@@ -32,10 +32,10 @@ ADMIN_IDS = {
     FRIEND_ADMIN_ID,
 }
 
-# Реквизиты берутся из Railway Variables
-PAYMENT_DETAILS = os.environ.get(
+# Реквизиты оплаты берём из Railway Variables
+PAYMENT_DETAILS = os.getenv(
     "PAYMENT_DETAILS",
-    "Реквизиты для оплаты пока не настроены."
+    "Реквизиты оплаты не настроены."
 )
 
 
@@ -75,17 +75,17 @@ TARIFFS = {
 
 
 # =========================================================
-# ХРАНИЛИЩЕ
+# ВРЕМЕННОЕ ХРАНИЛИЩЕ
 # =========================================================
 
-# user_id -> subscription
+# user_id -> информация о подписке
 subscriptions = {}
 
-# payment_id -> payment
-pending_payments = {}
+# payment_id -> информация об оплате
+payments = {}
 
 # admin_id -> payment_id
-admin_states = {}
+admin_waiting_vpn = {}
 
 
 # =========================================================
@@ -107,7 +107,7 @@ logger = logging.getLogger(__name__)
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     ),
 )
 
@@ -115,64 +115,22 @@ dp = Dispatcher()
 
 
 # =========================================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+# ПРОВЕРКА АДМИНА
 # =========================================================
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
 
-def create_payment(
-    user_id: int,
-    username: str | None,
-    days: int,
-):
-
-    tariff = TARIFFS.get(days)
-
-    if not tariff:
-        return None
-
-    payment_id = uuid.uuid4().hex[:10].upper()
-
-    payment = {
-        "id": payment_id,
-        "user_id": user_id,
-        "username": username or "без username",
-        "days": days,
-        "price": tariff["price"],
-        "status": "waiting_payment",
-        "created_at": datetime.now(timezone.utc),
-        "vpn_url": None,
-    }
-
-    pending_payments[payment_id] = payment
-
-    return payment
-
-
-def get_active_payment(user_id: int):
-
-    for payment in pending_payments.values():
-
-        if (
-            payment["user_id"] == user_id
-            and payment["status"] in {
-                "waiting_payment",
-                "waiting_admin",
-                "confirmed",
-                "waiting_vpn",
-            }
-        ):
-            return payment
-
-    return None
-
+# =========================================================
+# ГЛАВНОЕ МЕНЮ
+# =========================================================
 
 def main_keyboard():
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="🪡 Купить VPN",
@@ -202,56 +160,66 @@ def main_keyboard():
     )
 
 
+# =========================================================
+# МЕНЮ ТАРИФОВ
+# =========================================================
+
 def tariffs_keyboard():
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="🪦 7 дней — 60 руб",
-                    callback_data="tariff:7",
+                    callback_data="tariff_7",
                 )
             ],
 
             [
                 InlineKeyboardButton(
                     text="❄️ 14 дней — 100 руб",
-                    callback_data="tariff:14",
+                    callback_data="tariff_14",
                 )
             ],
 
             [
                 InlineKeyboardButton(
                     text="📜 30 дней — 200 руб",
-                    callback_data="tariff:30",
+                    callback_data="tariff_30",
                 )
             ],
 
             [
                 InlineKeyboardButton(
                     text="🕊️ 90 дней — 399 руб",
-                    callback_data="tariff:90",
+                    callback_data="tariff_90",
                 )
             ],
 
             [
                 InlineKeyboardButton(
                     text="⬅️ Назад",
-                    callback_data="back_main",
+                    callback_data="main_menu",
                 )
             ],
         ]
     )
 
 
+# =========================================================
+# ПОДТВЕРЖДЕНИЕ ПОКУПКИ
+# =========================================================
+
 def confirm_keyboard(days: int):
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="✅ Да, купить",
-                    callback_data=f"confirm_buy:{days}",
+                    callback_data=f"confirm_{days}",
                 )
             ],
 
@@ -265,42 +233,52 @@ def confirm_keyboard(days: int):
     )
 
 
+# =========================================================
+# КНОПКА ОПЛАТЫ
+# =========================================================
+
 def payment_keyboard(payment_id: str):
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="✅ Я оплатил",
-                    callback_data=f"user_paid:{payment_id}",
+                    callback_data=f"user_paid_{payment_id}",
                 )
             ],
 
             [
                 InlineKeyboardButton(
                     text="❌ Отмена",
-                    callback_data=f"cancel:{payment_id}",
+                    callback_data=f"cancel_{payment_id}",
                 )
             ],
         ]
     )
 
 
+# =========================================================
+# КНОПКИ АДМИНА
+# =========================================================
+
 def admin_payment_keyboard(payment_id: str):
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="✅ ПОДТВЕРДИТЬ ОПЛАТУ",
-                    callback_data=f"admin_confirm:{payment_id}",
+                    callback_data=f"admin_yes_{payment_id}",
                 )
             ],
 
             [
                 InlineKeyboardButton(
                     text="❌ ОТКЛОНИТЬ",
-                    callback_data=f"admin_reject:{payment_id}",
+                    callback_data=f"admin_no_{payment_id}",
                 )
             ],
         ]
@@ -311,7 +289,7 @@ def admin_payment_keyboard(payment_id: str):
 # START
 # =========================================================
 
-@dp.message(Command("start"))
+@dp.message(CommandStart())
 async def start(message: Message):
 
     await message.answer(
@@ -323,14 +301,27 @@ async def start(message: Message):
 
 
 # =========================================================
-# КУПИТЬ VPN
+# /PAY
+# =========================================================
+
+@dp.message(Command("pay"))
+async def pay_command(message: Message):
+
+    await message.answer(
+        "💷 <b>Выбери тариф:</b>",
+        reply_markup=tariffs_keyboard(),
+    )
+
+
+# =========================================================
+# КНОПКА "КУПИТЬ VPN"
 # =========================================================
 
 @dp.callback_query(F.data == "buy_menu")
 async def buy_menu(callback: CallbackQuery):
 
     await callback.message.edit_text(
-        "💷 <b>Выбери тариф</b>\n\n"
+        "💷 <b>ВЫБЕРИ ТАРИФ</b>\n\n"
         "Доступные варианты:",
         reply_markup=tariffs_keyboard(),
     )
@@ -342,12 +333,24 @@ async def buy_menu(callback: CallbackQuery):
 # ВЫБОР ТАРИФА
 # =========================================================
 
-@dp.callback_query(F.data.startswith("tariff:"))
-async def choose_tariff(callback: CallbackQuery):
+@dp.callback_query(F.data.startswith("tariff_"))
+async def tariff_selected(callback: CallbackQuery):
 
-    days = int(
-        callback.data.split(":")[1]
-    )
+    try:
+        days = int(
+            callback.data.replace(
+                "tariff_",
+                "",
+            )
+        )
+    except ValueError:
+
+        await callback.answer(
+            "Ошибка тарифа.",
+            show_alert=True,
+        )
+
+        return
 
     tariff = TARIFFS.get(days)
 
@@ -361,18 +364,20 @@ async def choose_tariff(callback: CallbackQuery):
         return
 
     await callback.message.edit_text(
-        "⚠️ <b>Подтверждение покупки</b>\n\n"
+
+        "⚠️ <b>ПОДТВЕРЖДЕНИЕ ПОКУПКИ</b>\n\n"
 
         "Действительно хочешь купить:\n\n"
 
         f"{tariff['emoji']} "
         f"<b>{tariff['name']}</b>\n"
 
-        f"💰 Стоимость: "
+        f"💰 Цена: "
         f"<b>{tariff['price']} руб</b>\n\n"
 
-        "После подтверждения появятся реквизиты для оплаты.",
-        
+        "После подтверждения появятся "
+        "реквизиты для оплаты.",
+
         reply_markup=confirm_keyboard(days),
     )
 
@@ -383,12 +388,24 @@ async def choose_tariff(callback: CallbackQuery):
 # ПОДТВЕРЖДЕНИЕ ПОКУПКИ
 # =========================================================
 
-@dp.callback_query(F.data.startswith("confirm_buy:"))
-async def confirm_buy(callback: CallbackQuery):
+@dp.callback_query(F.data.startswith("confirm_"))
+async def confirm_purchase(callback: CallbackQuery):
 
-    days = int(
-        callback.data.split(":")[1]
-    )
+    try:
+        days = int(
+            callback.data.replace(
+                "confirm_",
+                "",
+            )
+        )
+    except ValueError:
+
+        await callback.answer(
+            "Ошибка.",
+            show_alert=True,
+        )
+
+        return
 
     tariff = TARIFFS.get(days)
 
@@ -401,14 +418,30 @@ async def confirm_buy(callback: CallbackQuery):
 
         return
 
-    existing = get_active_payment(
-        callback.from_user.id
-    )
+    # Проверяем, нет ли уже активной заявки
+    existing = None
+
+    for payment in payments.values():
+
+        if (
+            payment["user_id"]
+            == callback.from_user.id
+            and payment["status"]
+            in (
+                "waiting_payment",
+                "waiting_admin",
+                "confirmed",
+            )
+        ):
+
+            existing = payment
+            break
 
     if existing:
 
         await callback.message.edit_text(
-            "⚠️ <b>У тебя уже есть активная заявка.</b>\n\n"
+
+            "⚠️ <b>У ТЕБЯ УЖЕ ЕСТЬ ЗАЯВКА</b>\n\n"
 
             f"Заявка: "
             f"<code>#{existing['id']}</code>\n"
@@ -419,29 +452,47 @@ async def confirm_buy(callback: CallbackQuery):
             f"Сумма: "
             f"<b>{existing['price']} руб</b>\n\n"
 
-            "Дождись обработки предыдущей заявки."
+            "Дождись обработки предыдущей заявки.",
+
+            reply_markup=main_keyboard(),
         )
 
         await callback.answer()
 
         return
 
-    payment = create_payment(
-        user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        days=days,
-    )
+    # Создаём новую оплату
+    payment_id = uuid.uuid4().hex[:10].upper()
 
-    if not payment:
+    payments[payment_id] = {
 
-        await callback.answer(
-            "Не удалось создать заявку.",
-            show_alert=True,
-        )
+        "id": payment_id,
 
-        return
+        "user_id":
+            callback.from_user.id,
+
+        "username":
+            callback.from_user.username
+            or "без username",
+
+        "days":
+            days,
+
+        "price":
+            tariff["price"],
+
+        "status":
+            "waiting_payment",
+
+        "created_at":
+            datetime.now(timezone.utc),
+
+        "vpn_url":
+            None,
+    }
 
     await callback.message.edit_text(
+
         "💷 <b>ОПЛАТА</b>\n\n"
 
         f"{tariff['emoji']} Тариф: "
@@ -452,15 +503,16 @@ async def confirm_buy(callback: CallbackQuery):
 
         "Переведи точную сумму по реквизитам:\n\n"
 
-        f"<code>{PAYMENT_DETAILS}</code>\n\n"
+        f"<code>{html.quote(PAYMENT_DETAILS)}</code>\n\n"
 
-        "После перевода нажми кнопку "
-        "«✅ Я оплатил».\n\n"
+        "После перевода нажми:\n"
+        "«✅ Я оплатил»\n\n"
 
-        "Оплата будет проверена администратором вручную.",
+        "Оплата будет проверена "
+        "администратором вручную.",
 
         reply_markup=payment_keyboard(
-            payment["id"]
+            payment_id
         ),
     )
 
@@ -471,14 +523,15 @@ async def confirm_buy(callback: CallbackQuery):
 # ПОЛЬЗОВАТЕЛЬ НАЖАЛ "Я ОПЛАТИЛ"
 # =========================================================
 
-@dp.callback_query(F.data.startswith("user_paid:"))
+@dp.callback_query(F.data.startswith("user_paid_"))
 async def user_paid(callback: CallbackQuery):
 
-    payment_id = callback.data.split(":")[1]
-
-    payment = pending_payments.get(
-        payment_id
+    payment_id = callback.data.replace(
+        "user_paid_",
+        "",
     )
+
+    payment = payments.get(payment_id)
 
     if not payment:
 
@@ -489,6 +542,7 @@ async def user_paid(callback: CallbackQuery):
 
         return
 
+    # Защита от чужой кнопки
     if payment["user_id"] != callback.from_user.id:
 
         await callback.answer(
@@ -498,10 +552,11 @@ async def user_paid(callback: CallbackQuery):
 
         return
 
+    # Защита от повторного нажатия
     if payment["status"] != "waiting_payment":
 
         await callback.answer(
-            "Эта заявка уже отправлена на проверку.",
+            "Заявка уже отправлена на проверку.",
             show_alert=True,
         )
 
@@ -514,19 +569,33 @@ async def user_paid(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(
-        "⏳ <b>Оплата отправлена на проверку.</b>\n\n"
 
-        f"Заявка: <code>#{payment_id}</code>\n"
+        "⏳ <b>ОПЛАТА ОТПРАВЛЕНА НА ПРОВЕРКУ</b>\n\n"
 
-        f"Тариф: <b>{payment['days']} дней</b>\n"
+        f"Заявка: "
+        f"<code>#{payment_id}</code>\n"
 
-        f"Сумма: <b>{payment['price']} руб</b>\n\n"
+        f"Тариф: "
+        f"<b>{payment['days']} дней</b>\n"
 
-        "Администратор проверит перевод и "
-        "подтвердит оплату."
+        f"Сумма: "
+        f"<b>{payment['price']} руб</b>\n\n"
+
+        "Проверь, чтобы перевод был отправлен "
+        "на правильные реквизиты.\n\n"
+
+        "Ожидай подтверждения администратора.",
+
+        reply_markup=main_keyboard(),
+    )
+
+    # Информация для админов
+    username = html.quote(
+        payment["username"]
     )
 
     admin_text = (
+
         "💷 <b>НОВАЯ ОПЛАТА</b>\n\n"
 
         f"🆔 Заявка: "
@@ -536,7 +605,7 @@ async def user_paid(callback: CallbackQuery):
         f"<code>{payment['user_id']}</code>\n"
 
         f"🔗 Username: "
-        f"@{payment['username']}\n"
+        f"@{username}\n"
 
         f"📦 Тариф: "
         f"<b>{payment['days']} дней</b>\n"
@@ -547,6 +616,7 @@ async def user_paid(callback: CallbackQuery):
         "Проверь перевод в банковском приложении."
     )
 
+    # Отправляем обоим админам
     for admin_id in ADMIN_IDS:
 
         if admin_id <= 0:
@@ -555,38 +625,43 @@ async def user_paid(callback: CallbackQuery):
         try:
 
             await bot.send_message(
-                admin_id,
-                admin_text,
-                reply_markup=admin_payment_keyboard(
-                    payment_id
-                ),
+
+                chat_id=admin_id,
+
+                text=admin_text,
+
+                reply_markup=
+                    admin_payment_keyboard(
+                        payment_id
+                    ),
             )
 
-        except Exception as e:
+        except Exception as error:
 
             logger.error(
                 "Ошибка отправки админу %s: %s",
                 admin_id,
-                e,
+                error,
             )
 
     await callback.answer(
-        "Заявка отправлена."
+        "Заявка отправлена администратору."
     )
 
 
 # =========================================================
-# ОТМЕНА ПЛАТЕЖА
+# ОТМЕНА ОПЛАТЫ
 # =========================================================
 
-@dp.callback_query(F.data.startswith("cancel:"))
+@dp.callback_query(F.data.startswith("cancel_"))
 async def cancel_payment(callback: CallbackQuery):
 
-    payment_id = callback.data.split(":")[1]
-
-    payment = pending_payments.get(
-        payment_id
+    payment_id = callback.data.replace(
+        "cancel_",
+        "",
     )
+
+    payment = payments.get(payment_id)
 
     if not payment:
 
@@ -608,7 +683,7 @@ async def cancel_payment(callback: CallbackQuery):
     if payment["status"] != "waiting_payment":
 
         await callback.answer(
-            "Заявка уже находится на проверке.",
+            "Заявка уже обрабатывается.",
             show_alert=True,
         )
 
@@ -617,9 +692,12 @@ async def cancel_payment(callback: CallbackQuery):
     payment["status"] = "cancelled"
 
     await callback.message.edit_text(
-        "❌ <b>Покупка отменена.</b>\n\n"
+
+        "❌ <b>ПОКУПКА ОТМЕНЕНА</b>\n\n"
         "Если захочешь купить VPN — "
-        "снова нажми «Купить VPN»."
+        "нажми «🪡 Купить VPN».",
+
+        reply_markup=main_keyboard(),
     )
 
     await callback.answer()
@@ -629,7 +707,7 @@ async def cancel_payment(callback: CallbackQuery):
 # АДМИН ПОДТВЕРЖДАЕТ ОПЛАТУ
 # =========================================================
 
-@dp.callback_query(F.data.startswith("admin_confirm:"))
+@dp.callback_query(F.data.startswith("admin_yes_"))
 async def admin_confirm(callback: CallbackQuery):
 
     if not is_admin(
@@ -643,11 +721,12 @@ async def admin_confirm(callback: CallbackQuery):
 
         return
 
-    payment_id = callback.data.split(":")[1]
-
-    payment = pending_payments.get(
-        payment_id
+    payment_id = callback.data.replace(
+        "admin_yes_",
+        "",
     )
+
+    payment = payments.get(payment_id)
 
     if not payment:
 
@@ -677,14 +756,17 @@ async def admin_confirm(callback: CallbackQuery):
         datetime.now(timezone.utc)
     )
 
-    admin_states[
+    # Запоминаем, какой админ будет вводить VPN
+    admin_waiting_vpn[
         callback.from_user.id
     ] = payment_id
 
     await callback.message.edit_text(
+
         "✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>\n\n"
 
-        f"Заявка: <code>#{payment_id}</code>\n"
+        f"Заявка: "
+        f"<code>#{payment_id}</code>\n"
 
         f"Пользователь: "
         f"<code>{payment['user_id']}</code>\n"
@@ -700,15 +782,19 @@ async def admin_confirm(callback: CallbackQuery):
     )
 
     await bot.send_message(
-        payment["user_id"],
 
-        "✅ <b>Оплата подтверждена!</b>\n\n"
+        chat_id=payment["user_id"],
 
-        f"Тариф: "
-        f"<b>{payment['days']} дней</b>\n\n"
+        text=(
 
-        "Сейчас выдаём VPN.\n"
-        "Ожидай ссылку."
+            "✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА!</b>\n\n"
+
+            f"Тариф: "
+            f"<b>{payment['days']} дней</b>\n\n"
+
+            "Администратор сейчас выдаёт VPN.\n"
+            "Ожидай ссылку."
+        ),
     )
 
     await callback.answer(
@@ -720,7 +806,7 @@ async def admin_confirm(callback: CallbackQuery):
 # АДМИН ОТКЛОНЯЕТ ОПЛАТУ
 # =========================================================
 
-@dp.callback_query(F.data.startswith("admin_reject:"))
+@dp.callback_query(F.data.startswith("admin_no_"))
 async def admin_reject(callback: CallbackQuery):
 
     if not is_admin(
@@ -734,11 +820,12 @@ async def admin_reject(callback: CallbackQuery):
 
         return
 
-    payment_id = callback.data.split(":")[1]
-
-    payment = pending_payments.get(
-        payment_id
+    payment_id = callback.data.replace(
+        "admin_no_",
+        "",
     )
+
+    payment = payments.get(payment_id)
 
     if not payment:
 
@@ -769,22 +856,29 @@ async def admin_reject(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(
+
         "❌ <b>ОПЛАТА ОТКЛОНЕНА</b>\n\n"
 
-        f"Заявка: <code>#{payment_id}</code>\n"
+        f"Заявка: "
+        f"<code>#{payment_id}</code>\n"
 
         f"Пользователь: "
         f"<code>{payment['user_id']}</code>"
     )
 
     await bot.send_message(
-        payment["user_id"],
 
-        "❌ <b>Оплата не подтверждена.</b>\n\n"
+        chat_id=payment["user_id"],
 
-        "Проверь сумму и реквизиты.\n"
-        "Если ты действительно сделал перевод — "
-        "обратись в поддержку."
+        text=(
+
+            "❌ <b>ОПЛАТА НЕ ПОДТВЕРЖДЕНА</b>\n\n"
+
+            "Проверь сумму и реквизиты.\n\n"
+
+            "Если перевод действительно был сделан, "
+            "обратись в поддержку."
+        ),
     )
 
     await callback.answer(
@@ -793,138 +887,151 @@ async def admin_reject(callback: CallbackQuery):
 
 
 # =========================================================
-# АДМИН ОТПРАВЛЯЕТ VPN URL
+# ПОЛУЧЕНИЕ VPN-ССЫЛКИ ОТ АДМИНА
 # =========================================================
 
 @dp.message()
-async def all_messages(message: Message):
+async def admin_vpn_message(message: Message):
 
     user_id = message.from_user.id
 
-    # -----------------------------------------------------
-    # ЕСЛИ АДМИН СЕЙЧАС ВЫДАЁТ VPN
-    # -----------------------------------------------------
+    # Если это не админ — ничего не делаем
+    if not is_admin(user_id):
+        return
 
-    if is_admin(user_id):
+    # Проверяем, ждём ли мы от этого админа VPN-ссылку
+    payment_id = admin_waiting_vpn.get(
+        user_id
+    )
 
-        payment_id = admin_states.get(
-            user_id
+    if not payment_id:
+        return
+
+    payment = payments.get(
+        payment_id
+    )
+
+    if not payment:
+
+        admin_waiting_vpn.pop(
+            user_id,
+            None,
         )
 
-        if payment_id:
+        await message.answer(
+            "❌ Заявка не найдена."
+        )
 
-            vpn_url = (
-                message.text or ""
-            ).strip()
+        return
 
-            if not (
-                vpn_url.startswith("http://")
-                or vpn_url.startswith("https://")
-            ):
+    if payment["status"] != "confirmed":
 
-                await message.answer(
-                    "❌ Это не похоже на subscription URL.\n\n"
-                    "Отправь полную ссылку из 3X-UI."
-                )
+        admin_waiting_vpn.pop(
+            user_id,
+            None,
+        )
 
-                return
+        await message.answer(
+            "❌ Эта заявка больше "
+            "не ожидает VPN."
+        )
 
-            payment = pending_payments.get(
-                payment_id
-            )
+        return
 
-            if not payment:
+    vpn_url = (
+        message.text or ""
+    ).strip()
 
-                admin_states.pop(
-                    user_id,
-                    None
-                )
+    # Проверяем ссылку
+    if not (
+        vpn_url.startswith("http://")
+        or vpn_url.startswith("https://")
+    ):
 
-                await message.answer(
-                    "❌ Заявка не найдена."
-                )
+        await message.answer(
 
-                return
+            "❌ <b>Неверная ссылка.</b>\n\n"
 
-            if payment["status"] != "confirmed":
+            "Отправь полную subscription-ссылку "
+            "из 3X-UI."
+        )
 
-                admin_states.pop(
-                    user_id,
-                    None
-                )
+        return
 
-                await message.answer(
-                    "❌ Эта заявка больше "
-                    "не ожидает VPN."
-                )
+    # Сохраняем подписку
+    now = datetime.now(
+        timezone.utc
+    )
 
-                return
+    expires = now + timedelta(
+        days=payment["days"]
+    )
 
-            # ---------------------------------------------
-            # СОХРАНЯЕМ ПОДПИСКУ
-            # ---------------------------------------------
+    subscriptions[
+        payment["user_id"]
+    ] = {
 
-            now = datetime.now(
-                timezone.utc
-            )
+        "days":
+            payment["days"],
 
-            expires = now + timedelta(
-                days=payment["days"]
-            )
+        "price":
+            payment["price"],
 
-            subscriptions[
-                payment["user_id"]
-            ] = {
-                "days": payment["days"],
-                "price": payment["price"],
-                "url": vpn_url,
-                "started_at": now,
-                "expires_at": expires,
-                "payment_id": payment_id,
-            }
+        "url":
+            vpn_url,
 
-            payment["vpn_url"] = vpn_url
-            payment["status"] = "completed"
-            payment["completed_at"] = now
+        "started_at":
+            now,
 
-            admin_states.pop(
-                user_id,
-                None
-            )
+        "expires_at":
+            expires,
 
-            # ---------------------------------------------
-            # ОТПРАВЛЯЕМ VPN ПОКУПАТЕЛЮ
-            # ---------------------------------------------
+        "payment_id":
+            payment_id,
+    }
 
-            await bot.send_message(
-                payment["user_id"],
+    payment["vpn_url"] = vpn_url
+    payment["status"] = "completed"
+    payment["completed_at"] = now
 
-                "⚔️ <b>VPN ГОТОВ</b>\n\n"
+    admin_waiting_vpn.pop(
+        user_id,
+        None,
+    )
 
-                f"Тариф: "
-                f"<b>{payment['days']} дней</b>\n"
+    # Отправляем VPN покупателю
+    await bot.send_message(
 
-                f"Оплата: "
-                f"<b>{payment['price']} руб</b>\n\n"
+        chat_id=payment["user_id"],
 
-                "Твоя subscription-ссылка:\n\n"
+        text=(
 
-                f"<code>{vpn_url}</code>\n\n"
+            "⚔️ <b>VPN ГОТОВ!</b>\n\n"
 
-                "Добавь её в Happ или V2Ray."
-            )
+            f"📦 Тариф: "
+            f"<b>{payment['days']} дней</b>\n"
 
-            await message.answer(
-                "✅ <b>VPN выдан.</b>\n\n"
+            f"💰 Оплата: "
+            f"<b>{payment['price']} руб</b>\n\n"
 
-                f"Заявка: "
-                f"<code>#{payment_id}</code>\n"
+            "🔗 <b>Твоя subscription-ссылка:</b>\n\n"
 
-                f"Пользователь: "
-                f"<code>{payment['user_id']}</code>"
-            )
+            f"<code>{html.quote(vpn_url)}</code>\n\n"
 
-            return
+            "Добавь эту ссылку в Happ или V2Ray."
+        ),
+    )
+
+    await message.answer(
+
+        "✅ <b>VPN ВЫДАН</b>\n\n"
+
+        f"Заявка: "
+        f"<code>#{payment_id}</code>\n"
+
+        f"Пользователь: "
+        f"<code>{payment['user_id']}</code>"
+    )
 
 
 # =========================================================
@@ -943,8 +1050,11 @@ async def my_subscription(
     if not subscription:
 
         await callback.message.edit_text(
-            "💷 <b>Моя подписка</b>\n\n"
+
+            "💷 <b>МОЯ ПОДПИСКА</b>\n\n"
+
             "Активной подписки нет.",
+
             reply_markup=main_keyboard(),
         )
 
@@ -963,8 +1073,11 @@ async def my_subscription(
     if expires <= now:
 
         await callback.message.edit_text(
-            "💷 <b>Моя подписка</b>\n\n"
+
+            "💷 <b>МОЯ ПОДПИСКА</b>\n\n"
+
             "Подписка закончилась.",
+
             reply_markup=main_keyboard(),
         )
 
@@ -977,17 +1090,18 @@ async def my_subscription(
     )
 
     await callback.message.edit_text(
+
         "💷 <b>МОЯ ПОДПИСКА</b>\n\n"
 
         f"📦 Тариф: "
         f"<b>{subscription['days']} дней</b>\n"
 
-        f"📅 До: "
+        f"📅 Действует до: "
         f"<b>{expires_text}</b>\n\n"
 
         "🔗 Subscription URL:\n\n"
 
-        f"<code>{subscription['url']}</code>",
+        f"<code>{html.quote(subscription['url'])}</code>",
 
         reply_markup=main_keyboard(),
     )
@@ -1003,16 +1117,18 @@ async def my_subscription(
 async def terms(callback: CallbackQuery):
 
     await callback.message.edit_text(
+
         "⚔️ <b>УСЛОВИЯ</b>\n\n"
 
         "VPN предоставляется на выбранный срок.\n\n"
 
         "Оплата проверяется вручную.\n"
+
         "После подтверждения оплаты "
         "администратор выдаёт VPN.\n\n"
 
-        "После окончания срока подписка "
-        "перестаёт действовать.",
+        "После окончания срока "
+        "подписка перестаёт действовать.",
 
         reply_markup=main_keyboard(),
     )
@@ -1028,6 +1144,7 @@ async def terms(callback: CallbackQuery):
 async def support(callback: CallbackQuery):
 
     await callback.message.edit_text(
+
         "🪡 <b>ПОДДЕРЖКА</b>\n\n"
 
         "Если возникла проблема с оплатой "
@@ -1040,16 +1157,16 @@ async def support(callback: CallbackQuery):
 
 
 # =========================================================
-# НАЗАД
+# ГЛАВНОЕ МЕНЮ
 # =========================================================
 
-@dp.callback_query(F.data == "back_main")
-async def back_main(
-    callback: CallbackQuery
-):
+@dp.callback_query(F.data == "main_menu")
+async def main_menu(callback: CallbackQuery):
 
     await callback.message.edit_text(
+
         "🪡 <b>ОТВАЛИVPN</b>\n\n"
+
         "Выбирай нужное действие 👇",
 
         reply_markup=main_keyboard(),
@@ -1059,33 +1176,22 @@ async def back_main(
 
 
 # =========================================================
-# COMMAND /pay
-# =========================================================
-
-@dp.message(Command("pay"))
-async def pay(message: Message):
-
-    await message.answer(
-        "💷 <b>Выбери тариф:</b>",
-        reply_markup=tariffs_keyboard(),
-    )
-
-
-# =========================================================
-# COMMAND /myid
+# /MYID
 # =========================================================
 
 @dp.message(Command("myid"))
 async def myid(message: Message):
 
     await message.answer(
-        "🆔 Твой Telegram ID:\n\n"
+
+        "🆔 <b>Твой Telegram ID:</b>\n\n"
+
         f"<code>{message.from_user.id}</code>"
     )
 
 
 # =========================================================
-# COMMAND /terms
+# /TERMS
 # =========================================================
 
 @dp.message(Command("terms"))
@@ -1094,17 +1200,20 @@ async def terms_command(
 ):
 
     await message.answer(
+
         "⚔️ <b>УСЛОВИЯ</b>\n\n"
 
         "VPN предоставляется на выбранный срок.\n"
+
         "Оплата проверяется вручную.\n"
+
         "После подтверждения оплаты "
         "администратор выдаёт VPN."
     )
 
 
 # =========================================================
-# COMMAND /paysupport
+# /PAYSUPPORT
 # =========================================================
 
 @dp.message(Command("paysupport"))
@@ -1113,19 +1222,22 @@ async def paysupport(
 ):
 
     await message.answer(
+
         "🪡 <b>ПОДДЕРЖКА</b>\n\n"
+
         "Если возникла проблема с оплатой "
         "или VPN — напиши администратору."
     )
 
 
 # =========================================================
-# НАСТРОЙКА BOTFATHER-КОМАНД
+# КОМАНДЫ TELEGRAM
 # =========================================================
 
 async def setup_bot():
 
     await bot.set_my_commands(
+
         [
             BotCommand(
                 command="start",
@@ -1155,7 +1267,7 @@ async def setup_bot():
     )
 
     logger.info(
-        "Bot setup complete"
+        "Команды Telegram установлены"
     )
 
 
@@ -1168,32 +1280,28 @@ async def main():
     if not BOT_TOKEN:
 
         raise RuntimeError(
-            "BOT_TOKEN не задан в Railway Variables"
+            "❌ BOT_TOKEN не найден в Railway Variables"
         )
 
     if ADMIN_ID <= 0:
 
         raise RuntimeError(
-            "ADMIN_ID не задан в Railway Variables"
+            "❌ ADMIN_ID не найден в Railway Variables"
         )
+
+    logger.info(
+        "Запуск ОтвалиVPN..."
+    )
 
     await setup_bot()
 
-    logger.info(
-        "Starting Telegram polling..."
+    await dp.start_polling(
+        bot
     )
-
-    try:
-
-        await dp.start_polling(bot)
-
-    finally:
-
-        await bot.session.close()
 
 
 # =========================================================
-# START
+# ЗАПУСК
 # =========================================================
 
 if __name__ == "__main__":

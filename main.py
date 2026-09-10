@@ -27,7 +27,6 @@ from aiogram.enums import ParseMode
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 
-# ID второго администратора
 FRIEND_ADMIN_ID = 1404271536
 
 ADMIN_IDS = {
@@ -35,13 +34,15 @@ ADMIN_IDS = {
     FRIEND_ADMIN_ID,
 }
 
-# Реквизиты хранятся в Railway Variables
+# Реквизиты находятся в Railway Variables
 PAYMENT_DETAILS = os.environ.get(
     "PAYMENT_DETAILS",
     "Реквизиты для оплаты пока не настроены."
 )
 
-WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
+WEBAPP_URL = (
+    "https://sweet-rejoicing-production.up.railway.app/app"
+)
 
 
 # =========================
@@ -49,6 +50,7 @@ WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
 # =========================
 
 TARIFFS = {
+
     7: {
         "days": 7,
         "price": 60,
@@ -89,6 +91,9 @@ pending_payments = {}
 
 admin_states = {}
 
+# Пользователи, которые уже получили пробу
+trial_users = set()
+
 
 # =========================
 # BOT
@@ -105,7 +110,7 @@ dp = Dispatcher()
 
 
 # =========================
-# ГЛАВНАЯ КЛАВИАТУРА
+# ГЛАВНОЕ МЕНЮ
 # =========================
 
 def main_keyboard():
@@ -119,6 +124,13 @@ def main_keyboard():
                     web_app=WebAppInfo(
                         url=WEBAPP_URL
                     )
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="🎁 3 дня бесплатно",
+                    callback_data="trial"
                 )
             ],
 
@@ -173,10 +185,36 @@ def main_keyboard():
 
 
 # =========================
-# КНОПКА ОПЛАТЫ
+# ПОДТВЕРЖДЕНИЕ ПОКУПКИ
 # =========================
 
-def payment_keyboard(days: int):
+def payment_confirm_keyboard(days: int):
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="✅ Подтвердить оплату",
+                    callback_data=f"confirm_buy_{days}"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="❌ Отмена",
+                    callback_data="cancel_payment"
+                )
+            ],
+        ]
+    )
+
+
+# =========================
+# РЕКВИЗИТЫ
+# =========================
+
+def payment_details_keyboard(days: int):
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -194,13 +232,12 @@ def payment_keyboard(days: int):
                     callback_data="cancel_payment"
                 )
             ],
-
         ]
     )
 
 
 # =========================
-# КНОПКИ АДМИНА
+# АДМИНСКАЯ КНОПКА ОПЛАТЫ
 # =========================
 
 def admin_payment_keyboard(
@@ -228,7 +265,34 @@ def admin_payment_keyboard(
                     )
                 )
             ],
+        ]
+    )
 
+
+# =========================
+# АДМИНСКАЯ КНОПКА ПРОБЫ
+# =========================
+
+def admin_trial_keyboard(
+    user_id: int
+):
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+
+            [
+                InlineKeyboardButton(
+                    text="✅ ВЫДАТЬ 3 ДНЯ",
+                    callback_data=f"confirm_trial_{user_id}"
+                )
+            ],
+
+            [
+                InlineKeyboardButton(
+                    text="❌ ОТКЛОНИТЬ",
+                    callback_data=f"reject_trial_{user_id}"
+                )
+            ],
         ]
     )
 
@@ -243,7 +307,8 @@ async def start(message: Message):
     text = (
         "🪡 <b>ОтвалиVPN</b>\n\n"
         "Быстрый VPN без лишнего гемора.\n\n"
-        "Выбирай тариф ниже или открывай приложение."
+        "🎁 Попробуй бесплатно 3 дня "
+        "или выбери тариф ниже."
     )
 
     await message.answer(
@@ -253,7 +318,7 @@ async def start(message: Message):
 
 
 # =========================
-# WEB APP DATA
+# WEB APP
 # =========================
 
 @dp.message(F.web_app_data)
@@ -276,7 +341,7 @@ async def web_app_data(message: Message):
 
     tariff = TARIFFS[days]
 
-    await send_payment_info(
+    await send_buy_confirmation(
         message,
         days,
         tariff["price"]
@@ -284,10 +349,10 @@ async def web_app_data(message: Message):
 
 
 # =========================
-# ИНФОРМАЦИЯ ОБ ОПЛАТЕ
+# ПЕРЕД РЕКВИЗИТАМИ
 # =========================
 
-async def send_payment_info(
+async def send_buy_confirmation(
     message: Message,
     days: int,
     price: int
@@ -296,35 +361,26 @@ async def send_payment_info(
     tariff = TARIFFS[days]
 
     text = (
-        f"{tariff['emoji']} "
-        f"<b>Покупка VPN — {tariff['name']}</b>\n\n"
+        "⚠️ <b>Подтверждение покупки</b>\n\n"
 
-        f"💰 Стоимость: "
-        f"<b>{price} руб</b>\n\n"
+        f"📦 Тариф: <b>{tariff['name']}</b>\n"
+        f"💰 Стоимость: <b>{price} руб</b>\n\n"
 
-        f"💳 <b>Реквизиты для оплаты:</b>\n"
-        f"<code>{PAYMENT_DETAILS}</code>\n\n"
+        "После подтверждения тебе будут "
+        "показаны реквизиты для перевода.\n\n"
 
-        "После перевода нажми кнопку ниже.\n"
-        "Оплата проверяется вручную."
+        "<b>Ты действительно хочешь оплатить "
+        "этот тариф?</b>"
     )
-
-    pending_payments[
-        message.from_user.id
-    ] = {
-        "days": days,
-        "price": price,
-        "created": datetime.now(timezone.utc),
-    }
 
     await message.answer(
         text,
-        reply_markup=payment_keyboard(days)
+        reply_markup=payment_confirm_keyboard(days)
     )
 
 
 # =========================
-# ПОКУПКА ТАРИФА
+# КНОПКА ТАРИФА
 # =========================
 
 @dp.callback_query(
@@ -360,10 +416,79 @@ async def buy_callback(
 
     await callback.answer()
 
-    await send_payment_info(
+    await send_buy_confirmation(
         callback.message,
         days,
         tariff["price"]
+    )
+
+
+# =========================
+# ПОДТВЕРДИЛ ПОКУПКУ
+# =========================
+
+@dp.callback_query(
+    F.data.startswith("confirm_buy_")
+)
+async def confirm_buy(
+    callback: CallbackQuery
+):
+
+    try:
+
+        days = int(
+            callback.data.split("_")[2]
+        )
+
+    except (ValueError, IndexError):
+
+        await callback.answer(
+            "Ошибка"
+        )
+
+        return
+
+    if days not in TARIFFS:
+
+        await callback.answer(
+            "Ошибка тарифа"
+        )
+
+        return
+
+    tariff = TARIFFS[days]
+
+    user_id = callback.from_user.id
+
+    pending_payments[user_id] = {
+        "days": days,
+        "price": tariff["price"],
+        "created": datetime.now(timezone.utc),
+    }
+
+    await callback.answer(
+        "Реквизиты открыты"
+    )
+
+    text = (
+        "💳 <b>Реквизиты для оплаты</b>\n\n"
+
+        f"📦 Тариф: <b>{tariff['name']}</b>\n"
+        f"💰 Сумма: <b>{tariff['price']} руб</b>\n\n"
+
+        f"<code>{PAYMENT_DETAILS}</code>\n\n"
+
+        "Переведи ровно указанную сумму.\n\n"
+
+        "После перевода нажми:\n"
+        "✅ <b>Я оплатил</b>\n\n"
+
+        "Оплата проверяется администратором вручную."
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=payment_details_keyboard(days)
     )
 
 
@@ -411,26 +536,23 @@ async def paid_callback(
     }
 
     await callback.answer(
-        "Заявка отправлена администратору."
+        "Заявка отправлена!"
     )
 
     await callback.message.edit_text(
 
         "🟡 <b>Ожидаем подтверждение оплаты</b>\n\n"
 
-        f"Тариф: {tariff['name']}\n"
-        f"Сумма: {tariff['price']} руб\n\n"
+        f"📦 Тариф: {tariff['name']}\n"
+        f"💰 Сумма: {tariff['price']} руб\n\n"
 
         "Администратор проверит перевод "
         "и подтвердит оплату."
     )
 
     username = (
-
         f"@{callback.from_user.username}"
-
         if callback.from_user.username
-
         else "без username"
     )
 
@@ -439,15 +561,9 @@ async def paid_callback(
         "💰 <b>НОВАЯ ОПЛАТА</b>\n\n"
 
         f"👤 Пользователь: {username}\n"
-
-        f"🆔 ID: "
-        f"<code>{user_id}</code>\n"
-
-        f"📦 Тариф: "
-        f"<b>{tariff['name']}</b>\n"
-
-        f"💵 Сумма: "
-        f"<b>{tariff['price']} руб</b>\n\n"
+        f"🆔 ID: <code>{user_id}</code>\n"
+        f"📦 Тариф: <b>{tariff['name']}</b>\n"
+        f"💵 Сумма: <b>{tariff['price']} руб</b>\n\n"
 
         "Проверь поступление денег "
         "в банковском приложении."
@@ -527,7 +643,7 @@ async def confirm_payment(
     if user_id not in pending_payments:
 
         await callback.answer(
-            "Заявка уже обработана или отсутствует."
+            "Заявка уже обработана."
         )
 
         return
@@ -586,10 +702,7 @@ async def confirm_payment(
         callback.message.text
 
         + "\n\n"
-        "✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>\n"
-
-        "Теперь отправьте VPN-ссылку "
-        "следующим сообщением."
+        "✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>"
     )
 
     await bot.send_message(
@@ -597,8 +710,7 @@ async def confirm_payment(
         callback.from_user.id,
 
         "🔗 <b>Отправь VPN subscription URL</b>\n\n"
-
-        "Просто вставь сюда ссылку из 3X-UI."
+        "Просто вставь ссылку из 3X-UI."
     )
 
     try:
@@ -608,7 +720,6 @@ async def confirm_payment(
             user_id,
 
             "✅ <b>Оплата подтверждена!</b>\n\n"
-
             "Администратор сейчас выдаёт тебе VPN."
         )
 
@@ -673,7 +784,6 @@ async def reject_payment(
             user_id,
 
             "❌ <b>Оплата не подтверждена.</b>\n\n"
-
             "Если ты уже переводил деньги, "
             "обратись в поддержку."
         )
@@ -683,7 +793,257 @@ async def reject_payment(
 
 
 # =========================
-# ПРИЁМ VPN ССЫЛКИ
+# 🎁 БЕСПЛАТНАЯ ПРОБА
+# =========================
+
+@dp.callback_query(
+    F.data == "trial"
+)
+async def trial_callback(
+    callback: CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    if user_id in trial_users:
+
+        await callback.answer(
+            "Ты уже использовал бесплатную пробу.",
+            show_alert=True
+        )
+
+        return
+
+    if user_id in subscriptions:
+
+        await callback.answer(
+            "У тебя уже есть подписка.",
+            show_alert=True
+        )
+
+        return
+
+    await callback.answer(
+        "Заявка отправлена!"
+    )
+
+    username = (
+        f"@{callback.from_user.username}"
+        if callback.from_user.username
+        else "без username"
+    )
+
+    admin_text = (
+
+        "🎁 <b>НОВАЯ ЗАЯВКА НА ПРОБУ</b>\n\n"
+
+        f"👤 Пользователь: {username}\n"
+        f"🆔 ID: <code>{user_id}</code>\n\n"
+
+        "Пользователь хочет получить "
+        "<b>3 дня бесплатно</b>."
+    )
+
+    for admin_id in ADMIN_IDS:
+
+        if admin_id == 0:
+            continue
+
+        try:
+
+            await bot.send_message(
+
+                admin_id,
+
+                admin_text,
+
+                reply_markup=admin_trial_keyboard(
+                    user_id
+                )
+            )
+
+        except Exception as e:
+
+            logging.error(
+                f"Ошибка отправки заявки "
+                f"на пробу админу {admin_id}: {e}"
+            )
+
+    await callback.message.edit_text(
+
+        "🟡 <b>Заявка на бесплатную пробу отправлена</b>\n\n"
+
+        "Администратор выдаст тебе VPN "
+        "на 3 дня после проверки.\n\n"
+
+        "Ожидай сообщение с VPN-ссылкой."
+    )
+
+
+# =========================
+# ВЫДАТЬ ПРОБУ
+# =========================
+
+@dp.callback_query(
+    F.data.startswith("confirm_trial_")
+)
+async def confirm_trial(
+    callback: CallbackQuery
+):
+
+    if callback.from_user.id not in ADMIN_IDS:
+
+        await callback.answer(
+            "Нет доступа"
+        )
+
+        return
+
+    try:
+
+        user_id = int(
+            callback.data.split("_")[2]
+        )
+
+    except (ValueError, IndexError):
+
+        await callback.answer(
+            "Ошибка"
+        )
+
+        return
+
+    if user_id in trial_users:
+
+        await callback.answer(
+            "Проба уже была выдана."
+        )
+
+        return
+
+    trial_users.add(user_id)
+
+    now = datetime.now(timezone.utc)
+
+    subscriptions[user_id] = {
+
+        "days": 3,
+
+        "price": 0,
+
+        "expires": (
+            now + timedelta(days=3)
+        ),
+    }
+
+    admin_states[
+        callback.from_user.id
+    ] = {
+
+        "type": "vpn_for_trial",
+
+        "user_id": user_id,
+
+        "days": 3,
+    }
+
+    await callback.answer(
+        "Проба подтверждена"
+    )
+
+    await callback.message.edit_text(
+
+        callback.message.text
+
+        + "\n\n"
+        "✅ <b>ПРОБА ПОДТВЕРЖДЕНА</b>"
+    )
+
+    await bot.send_message(
+
+        callback.from_user.id,
+
+        "🔗 <b>Отправь VPN subscription URL</b>\n\n"
+        "Создай пользователю 3 дня в 3X-UI "
+        "и вставь сюда его subscription URL."
+    )
+
+    try:
+
+        await bot.send_message(
+
+            user_id,
+
+            "🎁 <b>Бесплатная проба одобрена!</b>\n\n"
+            "Администратор сейчас выдаёт тебе VPN "
+            "на 3 дня."
+        )
+
+    except Exception:
+        pass
+
+
+# =========================
+# ОТКЛОНИТЬ ПРОБУ
+# =========================
+
+@dp.callback_query(
+    F.data.startswith("reject_trial_")
+)
+async def reject_trial(
+    callback: CallbackQuery
+):
+
+    if callback.from_user.id not in ADMIN_IDS:
+
+        await callback.answer(
+            "Нет доступа"
+        )
+
+        return
+
+    try:
+
+        user_id = int(
+            callback.data.split("_")[2]
+        )
+
+    except (ValueError, IndexError):
+
+        await callback.answer(
+            "Ошибка"
+        )
+
+        return
+
+    await callback.answer(
+        "Заявка отклонена"
+    )
+
+    await callback.message.edit_text(
+
+        callback.message.text
+
+        + "\n\n"
+        "❌ <b>ПРОБА ОТКЛОНЕНА</b>"
+    )
+
+    try:
+
+        await bot.send_message(
+
+            user_id,
+
+            "❌ К сожалению, бесплатная проба "
+            "сейчас недоступна."
+        )
+
+    except Exception:
+        pass
+
+
+# =========================
+# ПОЛУЧЕНИЕ VPN ССЫЛКИ
 # =========================
 
 @dp.message(F.text)
@@ -700,75 +1060,102 @@ async def text_handler(
 
         state = admin_states[user_id]
 
-        if state["type"] == "vpn_for_payment":
+        buyer_id = state["user_id"]
 
-            buyer_id = state["user_id"]
+        vpn_link = message.text.strip()
 
-            vpn_link = message.text.strip()
+        valid = (
 
-            valid = (
+            vpn_link.startswith("http://")
 
-                vpn_link.startswith("http://")
+            or vpn_link.startswith("https://")
 
-                or vpn_link.startswith("https://")
+            or vpn_link.startswith("vless://")
 
-                or vpn_link.startswith("vless://")
+            or vpn_link.startswith("vmess://")
 
-                or vpn_link.startswith("vmess://")
+            or vpn_link.startswith("trojan://")
 
-                or vpn_link.startswith("trojan://")
+            or vpn_link.startswith("ss://")
+        )
 
-                or vpn_link.startswith("ss://")
+        if not valid:
+
+            await message.answer(
+
+                "❌ Это не похоже "
+                "на VPN subscription URL.\n\n"
+
+                "Просто вставь ссылку из 3X-UI."
             )
 
-            if not valid:
-
-                await message.answer(
-
-                    "❌ Это не похоже "
-                    "на VPN subscription URL.\n\n"
-
-                    "Просто вставь ссылку из 3X-UI."
-                )
-
-                return
-
-            try:
-
-                await bot.send_message(
-
-                    buyer_id,
-
-                    "🎉 <b>VPN готов!</b>\n\n"
-
-                    "Твоя ссылка:\n\n"
-
-                    f"<code>{vpn_link}</code>\n\n"
-
-                    "Добавь её в HAPP или V2Ray."
-                )
-
-                await message.answer(
-
-                    "✅ VPN успешно "
-                    "отправлен пользователю."
-                )
-
-            except Exception as e:
-
-                await message.answer(
-
-                    f"❌ Не удалось "
-                    f"отправить VPN:\n{e}"
-                )
-
-            del admin_states[user_id]
-
             return
+
+        try:
+
+            await bot.send_message(
+
+                buyer_id,
+
+                "🎉 <b>VPN готов!</b>\n\n"
+
+                "Твоя ссылка:\n\n"
+
+                f"<code>{vpn_link}</code>\n\n"
+
+                "Добавь её в HAPP или V2Ray."
+            )
+
+            await message.answer(
+
+                "✅ VPN успешно "
+                "отправлен пользователю."
+            )
+
+        except Exception as e:
+
+            await message.answer(
+
+                f"❌ Не удалось "
+                f"отправить VPN:\n{e}"
+            )
+
+        del admin_states[user_id]
+
+        return
 
     await message.answer(
 
         "Выбери действие в меню 👇",
+
+        reply_markup=main_keyboard()
+    )
+
+
+# =========================
+# ОТМЕНА
+# =========================
+
+@dp.callback_query(
+    F.data == "cancel_payment"
+)
+async def cancel_payment(
+    callback: CallbackQuery
+):
+
+    pending_payments.pop(
+        callback.from_user.id,
+        None
+    )
+
+    await callback.answer(
+        "Отменено"
+    )
+
+    await callback.message.edit_text(
+
+        "❌ <b>Покупка отменена.</b>\n\n"
+        "Можешь выбрать другой тариф.",
 
         reply_markup=main_keyboard()
     )
@@ -799,7 +1186,6 @@ async def my_subscription(
 
             "💷 <b>У тебя пока нет "
             "активной подписки.</b>\n\n"
-
             "Выбери тариф ниже.",
 
             reply_markup=main_keyboard()
@@ -809,14 +1195,33 @@ async def my_subscription(
 
     expires = sub["expires"]
 
+    if expires <= datetime.now(timezone.utc):
+
+        await callback.answer()
+
+        await callback.message.answer(
+
+            "💷 <b>Твоя подписка закончилась.</b>\n\n"
+            "Выбери новый тариф.",
+
+            reply_markup=main_keyboard()
+        )
+
+        return
+
     await callback.answer()
+
+    type_text = (
+        "🎁 Бесплатная проба"
+        if sub["price"] == 0
+        else f"{sub['days']} дней"
+    )
 
     await callback.message.answer(
 
         "💷 <b>Моя подписка</b>\n\n"
 
-        f"📦 Тариф: "
-        f"{sub['days']} дней\n"
+        f"📦 Тариф: <b>{type_text}</b>\n"
 
         f"📅 Действует до: "
         f"<b>{expires.strftime('%d.%m.%Y %H:%M')}</b> UTC"
@@ -842,6 +1247,9 @@ async def terms_callback(
 
         "• VPN предоставляется "
         "на оплаченный срок.\n"
+
+        "• Бесплатная проба предоставляется "
+        "один раз.\n"
 
         "• После окончания срока "
         "доступ прекращается.\n"
@@ -912,6 +1320,8 @@ async def terms_command(
 
         "VPN предоставляется "
         "на оплаченный срок.\n"
+
+        "Бесплатная проба — 3 дня.\n"
 
         "Не передавай VPN-ссылку "
         "другим людям."
@@ -1092,15 +1502,10 @@ async def start_web_server():
 
 
 # =========================
-# НАСТРОЙКА TELEGRAM
+# TELEGRAM
 # =========================
 
 async def setup_bot():
-
-    # ВАЖНО:
-    # Используем BotCommand, а не tuple.
-    # Именно это исправляет ошибку
-    # Pydantic ValidationError.
 
     await bot.set_my_commands([
 

@@ -5,7 +5,10 @@
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        content="width=device-width,
+        initial-scale=1.0,
+        maximum-scale=1.0,
+        user-scalable=no"
     >
 
     <title>ОтвалиVPN</title>
@@ -13,10 +16,8 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
-
         * {
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
         }
 
         html,
@@ -25,1022 +26,240 @@
             padding: 0;
             width: 100%;
             min-height: 100%;
-            font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-            background: #000;
-            color: #fff;
+            font-family: Arial, sans-serif;
+            background: #050505;
+            color: white;
         }
-
-
-        /* ==================================================
-           ФОН
-        ================================================== */
 
         body {
-
             min-height: 100vh;
-
-            background-image:
+            background:
                 linear-gradient(
-                    rgba(0, 0, 0, 0.78),
-                    rgba(0, 0, 0, 0.88)
+                    rgba(0,0,0,.78),
+                    rgba(0,0,0,.90)
                 ),
-                url("./60044.jpg");
+                url("background.png");
 
             background-size: cover;
-
             background-position: center;
-
             background-attachment: fixed;
-
-            overflow-x: hidden;
         }
-
-
-        /* ==================================================
-           ОСНОВНОЙ КОНТЕЙНЕР
-        ================================================== */
 
         .page {
-
             min-height: 100vh;
-
-            padding:
-                28px
-                18px
-                24px;
-
+            padding: 30px 18px 20px;
             display: flex;
-
             flex-direction: column;
-
-            align-items: center;
         }
 
+        .title {
+            font-size: 42px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            margin-bottom: 4px;
+        }
 
-        .content {
+        .subtitle {
+            color: #aaa;
+            font-size: 15px;
+            margin-bottom: 30px;
+        }
 
+        .tariffs {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .tariff {
+            position: relative;
             width: 100%;
+            padding: 20px 18px;
+            border: 2px solid #fff;
+            background: #080808;
+            color: white;
+            text-align: left;
+            cursor: pointer;
 
-            max-width: 460px;
+            transform: rotate(-0.7deg);
+
+            box-shadow:
+                5px 5px 0 #fff;
+
+            transition: .12s;
         }
 
+        .tariff:nth-child(2) {
+            transform: rotate(.6deg);
+        }
 
-        /* ==================================================
-           ЛОГО
-        ================================================== */
+        .tariff:nth-child(3) {
+            transform: rotate(-.4deg);
+        }
 
-        .logo {
+        .tariff:nth-child(4) {
+            transform: rotate(.5deg);
+        }
 
-            text-align: center;
+        .tariff:active {
+            transform:
+                translate(4px, 4px)
+                rotate(0deg);
 
-            margin-top: 12px;
+            box-shadow: none;
+        }
 
+        .days {
+            font-size: 22px;
+            font-weight: 900;
+        }
+
+        .price {
+            margin-top: 5px;
+            font-size: 31px;
+            font-weight: 900;
+        }
+
+        .small {
+            margin-top: 7px;
+            color: #888;
+            font-size: 13px;
+        }
+
+        .info {
+            margin-top: 30px;
+            padding: 18px;
+            border: 1px solid #333;
+            background: rgba(0,0,0,.75);
+        }
+
+        .info-title {
+            font-weight: 900;
             margin-bottom: 8px;
         }
 
-
-        .logo-symbol {
-
-            font-size: 58px;
-
-            line-height: 1;
-
-            filter:
-                drop-shadow(
-                    0 0 18px
-                    rgba(255,255,255,0.16)
-                );
-        }
-
-
-        .title {
-
-            margin-top: 10px;
-
-            font-size: 34px;
-
-            font-weight: 900;
-
-            letter-spacing: -1.5px;
-
-            text-transform: uppercase;
-        }
-
-
-        .subtitle {
-
-            margin-top: 7px;
-
-            color: #b8b8b8;
-
-            font-size: 13px;
-
-            letter-spacing: 2px;
-
-            text-transform: uppercase;
-        }
-
-
-        /* ==================================================
-           СТАТУС
-        ================================================== */
-
-        .status {
-
-            margin-top: 25px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            gap: 8px;
-
-            color: #d4d4d4;
-
-            font-size: 13px;
-
-            text-transform: uppercase;
-
-            letter-spacing: 1px;
-        }
-
-
-        .status-dot {
-
-            width: 8px;
-
-            height: 8px;
-
-            border-radius: 50%;
-
-            background: #fff;
-
-            box-shadow:
-                0 0 10px
-                rgba(255,255,255,0.8);
-        }
-
-
-        /* ==================================================
-           ЗАГОЛОВОК
-        ================================================== */
-
-        .section-title {
-
-            margin-top: 34px;
-
-            margin-bottom: 14px;
-
-            font-size: 13px;
-
-            font-weight: 700;
-
-            letter-spacing: 2px;
-
-            text-transform: uppercase;
-
-            color: #aaa;
-        }
-
-
-        /* ==================================================
-           КАРТОЧКИ ТАРИФОВ
-        ================================================== */
-
-        .plans {
-
-            display: flex;
-
-            flex-direction: column;
-
-            gap: 13px;
-        }
-
-
-        .plan {
-
-            position: relative;
-
-            width: 100%;
-
-            min-height: 92px;
-
-            padding: 18px 19px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: space-between;
-
-            gap: 15px;
-
-            cursor: pointer;
-
-            color: #000;
-
-            background:
-                #eeeeea;
-
-            border: none;
-
-            box-shadow:
-                5px 6px 0 #111,
-                0 0 0 1px rgba(255,255,255,0.15);
-
-            transition:
-                transform 0.12s ease,
-                box-shadow 0.12s ease;
-
-            overflow: hidden;
-        }
-
-
-        /* Лёгкая "бумажная" неровность */
-
-        .plan:nth-child(1) {
-
-            transform:
-                rotate(-1deg);
-        }
-
-
-        .plan:nth-child(2) {
-
-            transform:
-                rotate(0.7deg);
-        }
-
-
-        .plan:nth-child(3) {
-
-            transform:
-                rotate(-0.5deg);
-        }
-
-
-        .plan:hover {
-
-            transform:
-                rotate(0deg)
-                translateY(-2px);
-
-            box-shadow:
-                7px 9px 0 #111;
-        }
-
-
-        .plan:active {
-
-            transform:
-                rotate(0deg)
-                translateY(3px);
-
-            box-shadow:
-                2px 3px 0 #111;
-        }
-
-
-        .plan::after {
-
-            content: "";
-
-            position: absolute;
-
-            right: -25px;
-
-            top: -35px;
-
-            width: 90px;
-
-            height: 90px;
-
-            border-radius: 50%;
-
-            background:
-                rgba(0,0,0,0.035);
-        }
-
-
-        .plan-left {
-
-            position: relative;
-
-            z-index: 2;
-        }
-
-
-        .plan-name {
-
-            font-size: 20px;
-
-            font-weight: 900;
-
-            letter-spacing: -0.5px;
-        }
-
-
-        .plan-description {
-
-            margin-top: 5px;
-
-            font-size: 11px;
-
-            color: #555;
-
-            text-transform: uppercase;
-
-            letter-spacing: 1px;
-        }
-
-
-        .plan-price {
-
-            position: relative;
-
-            z-index: 2;
-
-            flex-shrink: 0;
-
-            padding:
-                9px
-                11px;
-
-            background: #000;
-
-            color: #fff;
-
-            font-size: 15px;
-
-            font-weight: 800;
-
-            transform: rotate(1.5deg);
-
-            box-shadow:
-                3px 3px 0 #888;
-        }
-
-
-        /* ==================================================
-           КНОПКА МОЕЙ ПОДПИСКИ
-        ================================================== */
-
-        .subscription {
-
-            margin-top: 22px;
-
-            width: 100%;
-
-            padding: 17px;
-
-            border: 1px solid #292929;
-
-            background:
-                rgba(10,10,10,0.88);
-
-            color: #fff;
-
-            font-size: 15px;
-
-            font-weight: 800;
-
-            letter-spacing: 0.3px;
-
-            cursor: pointer;
-
-            transform:
-                rotate(0.5deg);
-
-            box-shadow:
-                4px 4px 0 #222;
-
-            transition:
-                transform 0.12s ease;
-        }
-
-
-        .subscription:active {
-
-            transform:
-                translateY(3px)
-                rotate(0deg);
-        }
-
-
-        /* ==================================================
-           ИНФОРМАЦИОННЫЙ БЛОК
-        ================================================== */
-
-        .info {
-
-            margin-top: 28px;
-
-            padding: 18px;
-
-            background:
-                rgba(0,0,0,0.76);
-
-            border:
-                1px solid
-                rgba(255,255,255,0.08);
-
-            box-shadow:
-                5px 5px 0
-                rgba(255,255,255,0.04);
-        }
-
-
-        .info-title {
-
-            font-size: 14px;
-
-            font-weight: 800;
-
-            margin-bottom: 10px;
-        }
-
-
         .info-text {
-
             color: #aaa;
-
-            font-size: 12px;
-
-            line-height: 1.6;
+            font-size: 14px;
+            line-height: 1.5;
         }
 
-
-        /* ==================================================
-           НИЖНИЕ КНОПКИ
-        ================================================== */
-
-        .bottom-buttons {
-
-            display: flex;
-
-            gap: 10px;
-
-            margin-top: 15px;
-        }
-
-
-        .small-button {
-
-            flex: 1;
-
-            padding: 14px 10px;
-
-            background:
-                rgba(15,15,15,0.9);
-
-            color: #ddd;
-
-            border:
-                1px solid #292929;
-
-            font-size: 12px;
-
-            font-weight: 700;
-
-            cursor: pointer;
-
-            box-shadow:
-                3px 3px 0 #181818;
-
-            transition:
-                transform 0.12s ease;
-        }
-
-
-        .small-button:first-child {
-
-            transform:
-                rotate(-0.8deg);
-        }
-
-
-        .small-button:last-child {
-
-            transform:
-                rotate(0.8deg);
-        }
-
-
-        .small-button:active {
-
-            transform:
-                translateY(3px)
-                rotate(0deg);
-        }
-
-
-        /* ==================================================
-           FOOTER
-        ================================================== */
-
-        .footer {
-
-            width: 100%;
-
+        footer {
             margin-top: auto;
-
-            padding-top: 42px;
-
-            padding-bottom: 8px;
-
+            padding-top: 40px;
             text-align: center;
-
-            color: #777;
-
-            font-size: 10px;
-
-            letter-spacing: 1.5px;
-
-            text-transform: lowercase;
-
-            line-height: 1.8;
-        }
-
-
-        .footer strong {
-
-            color: #aaa;
-
-            font-weight: 600;
-        }
-
-
-        /* ==================================================
-           МОДАЛЬНОЕ ОКНО
-        ================================================== */
-
-        .modal {
-
-            position: fixed;
-
-            inset: 0;
-
-            display: none;
-
-            align-items: center;
-
-            justify-content: center;
-
-            padding: 20px;
-
-            background:
-                rgba(0,0,0,0.82);
-
-            z-index: 100;
-        }
-
-
-        .modal.show {
-
-            display: flex;
-        }
-
-
-        .modal-box {
-
-            width: 100%;
-
-            max-width: 390px;
-
-            padding: 24px;
-
-            background: #0d0d0d;
-
-            border:
-                1px solid #333;
-
-            box-shadow:
-                7px 8px 0 #050505;
-
-            transform:
-                rotate(-0.7deg);
-        }
-
-
-        .modal-title {
-
-            font-size: 22px;
-
-            font-weight: 900;
-
-            margin-bottom: 14px;
-        }
-
-
-        .modal-text {
-
-            color: #aaa;
-
-            font-size: 13px;
-
-            line-height: 1.65;
-
-            white-space: pre-line;
-        }
-
-
-        .modal-close {
-
-            width: 100%;
-
-            margin-top: 20px;
-
-            padding: 14px;
-
-            background: #eee;
-
-            color: #000;
-
-            border: none;
-
-            font-size: 13px;
-
-            font-weight: 900;
-
-            cursor: pointer;
-
-            transform:
-                rotate(0.8deg);
-        }
-
-
-        /* ==================================================
-           ЗАГРУЗКА
-        ================================================== */
-
-        .loading {
-
-            position: fixed;
-
-            inset: 0;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            background: #000;
-
-            z-index: 999;
-
-            transition:
-                opacity 0.35s ease;
-        }
-
-
-        .loading.hide {
-
-            opacity: 0;
-
-            pointer-events: none;
-        }
-
-
-        .loading-inner {
-
-            text-align: center;
-        }
-
-
-        .loading-logo {
-
-            font-size: 52px;
-        }
-
-
-        .loading-text {
-
-            margin-top: 12px;
-
-            color: #777;
-
+            color: #555;
             font-size: 11px;
-
-            letter-spacing: 3px;
-
-            text-transform: uppercase;
         }
-
-
-        /* ==================================================
-           МОБИЛЬНАЯ АДАПТАЦИЯ
-        ================================================== */
-
-        @media (max-width: 380px) {
-
-            .page {
-
-                padding-left: 14px;
-
-                padding-right: 14px;
-            }
-
-            .title {
-
-                font-size: 29px;
-            }
-
-            .plan {
-
-                min-height: 86px;
-
-                padding: 15px;
-            }
-
-            .plan-name {
-
-                font-size: 18px;
-            }
-        }
-
     </style>
 </head>
 
-
 <body>
-
-
-<!-- ======================================================
-     LOADING
-====================================================== -->
-
-<div class="loading" id="loading">
-
-    <div class="loading-inner">
-
-        <div class="loading-logo">
-            🪦
-        </div>
-
-        <div class="loading-text">
-            ОтвалиVPN
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- ======================================================
-     PAGE
-====================================================== -->
 
 <div class="page">
 
-    <div class="content">
+    <div class="title">
+        ОтвалиVPN
+    </div>
 
+    <div class="subtitle">
+        VPN без лишнего гемора.
+    </div>
 
-        <!-- LOGO -->
-
-        <div class="logo">
-
-            <div class="logo-symbol">
-                🪦
-            </div>
-
-            <div class="title">
-                ОтвалиVPN
-            </div>
-
-            <div class="subtitle">
-                just disappear
-            </div>
-
-        </div>
-
-
-        <!-- STATUS -->
-
-        <div class="status">
-
-            <span class="status-dot"></span>
-
-            <span>
-                VPN system online
-            </span>
-
-        </div>
-
-
-        <!-- TARIFFS -->
-
-        <div class="section-title">
-            choose your escape
-        </div>
-
-
-        <div class="plans">
-
-
-            <!-- 7 DAYS -->
-
-            <button
-                class="plan"
-                onclick="buy('7')"
-            >
-
-                <div class="plan-left">
-
-                    <div class="plan-name">
-                        🪡 7 ДНЕЙ
-                    </div>
-
-                    <div class="plan-description">
-                        короткий побег
-                    </div>
-
-                </div>
-
-
-                <div class="plan-price">
-                    59 ⭐
-                </div>
-
-            </button>
-
-
-            <!-- 30 DAYS -->
-
-            <button
-                class="plan"
-                onclick="buy('30')"
-            >
-
-                <div class="plan-left">
-
-                    <div class="plan-name">
-                        ❄ 30 ДНЕЙ
-                    </div>
-
-                    <div class="plan-description">
-                        месяц свободы
-                    </div>
-
-                </div>
-
-
-                <div class="plan-price">
-                    129 ⭐
-                </div>
-
-            </button>
-
-
-            <!-- 90 DAYS -->
-
-            <button
-                class="plan"
-                onclick="buy('90')"
-            >
-
-                <div class="plan-left">
-
-                    <div class="plan-name">
-                        🧶 90 ДНЕЙ
-                    </div>
-
-                    <div class="plan-description">
-                        исчезни надолго
-                    </div>
-
-                </div>
-
-
-                <div class="plan-price">
-                    399 ⭐
-                </div>
-
-            </button>
-
-
-        </div>
-
-
-        <!-- SUBSCRIPTION -->
+    <div class="tariffs">
 
         <button
-            class="subscription"
-            onclick="openSubscription()"
+            class="tariff"
+            onclick="buy(7)"
         >
+            <div class="days">
+                7 ДНЕЙ
+            </div>
 
-            🪦 МОЯ ПОДПИСКА
+            <div class="price">
+                60 руб
+            </div>
 
+            <div class="small">
+                Быстрый тест
+            </div>
         </button>
 
 
-        <!-- INFO -->
-
-        <div class="info">
-
-            <div class="info-title">
-                🗡 Отваливай спокойно
-            </div>
-
-            <div class="info-text">
-
-                Выбираешь тариф → оплачиваешь
-                Telegram Stars → получаешь VPN-ссылку.
-
-                <br><br>
-
-                Подключение происходит через
-                Happ или совместимый V2Ray-клиент.
-
-            </div>
-
-        </div>
-
-
-        <!-- BOTTOM BUTTONS -->
-
-        <div class="bottom-buttons">
-
-            <button
-                class="small-button"
-                onclick="showTerms()"
-            >
-                📜 УСЛОВИЯ
-            </button>
-
-
-            <button
-                class="small-button"
-                onclick="showSupport()"
-            >
-                🛠 ПОДДЕРЖКА
-            </button>
-
-        </div>
-
-
-        <!-- FOOTER -->
-
-        <div class="footer">
-
-            created by
-            <strong>lobotomiya</strong>
-
-            <br>
-
-            or
-            <strong>hackentik</strong>
-
-        </div>
-
-
-    </div>
-
-</div>
-
-
-<!-- ======================================================
-     MODAL
-====================================================== -->
-
-<div
-    class="modal"
-    id="modal"
-    onclick="closeModal(event)"
->
-
-    <div
-        class="modal-box"
-        onclick="event.stopPropagation()"
-    >
-
-        <div
-            class="modal-title"
-            id="modalTitle"
+        <button
+            class="tariff"
+            onclick="buy(14)"
         >
-            ОтвалиVPN
-        </div>
+            <div class="days">
+                14 ДНЕЙ
+            </div>
 
+            <div class="price">
+                100 руб
+            </div>
 
-        <div
-            class="modal-text"
-            id="modalText"
-        ></div>
+            <div class="small">
+                Выгодный вариант
+            </div>
+        </button>
 
 
         <button
-            class="modal-close"
-            onclick="hideModal()"
+            class="tariff"
+            onclick="buy(30)"
         >
-            ЗАКРЫТЬ
+            <div class="days">
+                30 ДНЕЙ
+            </div>
+
+            <div class="price">
+                200 руб
+            </div>
+
+            <div class="small">
+                Оптимальный вариант
+            </div>
+        </button>
+
+
+        <button
+            class="tariff"
+            onclick="buy(90)"
+        >
+            <div class="days">
+                90 ДНЕЙ
+            </div>
+
+            <div class="price">
+                399 руб
+            </div>
+
+            <div class="small">
+                Максимальный срок
+            </div>
         </button>
 
     </div>
+
+
+    <div class="info">
+
+        <div class="info-title">
+            Как купить
+        </div>
+
+        <div class="info-text">
+            Выбери срок → получи реквизиты →
+            переведи нужную сумму → нажми
+            «Я оплатил» → после проверки получишь VPN.
+        </div>
+
+    </div>
+
+
+    <footer>
+        created by lobotomiya or hackentik
+    </footer>
 
 </div>
 
@@ -1050,278 +269,20 @@
     const tg = window.Telegram.WebApp;
 
     tg.ready();
-
     tg.expand();
 
 
-    /* ==================================================
-       УБИРАЕМ LOADING
-    ================================================== */
+    function buy(days) {
 
-    window.addEventListener(
-        "load",
-        function() {
+        tg.sendData("buy:" + days);
 
-            setTimeout(
-                function() {
-
-                    document
-                        .getElementById("loading")
-                        .classList.add("hide");
-
-                },
-                350
-            );
-
-        }
-    );
-
-
-    /* ==================================================
-       ПОКУПКА
-    ================================================== */
-
-    async function buy(tariff) {
-
-        try {
-
-            tg.HapticFeedback.impactOccurred(
-                "medium"
-            );
-
-        } catch (e) {}
-
-
-        try {
-
-            const response =
-                await fetch(
-                    "/create-invoice",
-                    {
-
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body: JSON.stringify({
-                            tariff: tariff
-                        })
-
-                    }
-                );
-
-
-            const data =
-                await response.json();
-
-
-            if (
-                !data.ok ||
-                !data.invoice
-            ) {
-
-                showModal(
-                    "Ошибка",
-                    data.error ||
-                    "Не удалось создать оплату."
-                );
-
-                return;
-            }
-
-
-            tg.openInvoice(
-                data.invoice,
-                function(status) {
-
-                    if (
-                        status === "paid"
-                    ) {
-
-                        showModal(
-
-                            "🎉 Оплата прошла",
-
-                            "Оплата успешно завершена.\n\n" +
-                            "Теперь VPN будет выдан вручную.\n\n" +
-                            "Ссылка придёт сюда автоматически."
-                        );
-
-                    }
-
-                    else if (
-                        status === "cancelled"
-                    ) {
-
-                        showModal(
-                            "Оплата отменена",
-                            "Ты отменил оплату."
-                        );
-
-                    }
-
-                    else if (
-                        status === "failed"
-                    ) {
-
-                        showModal(
-                            "Ошибка оплаты",
-                            "Telegram не смог завершить платёж."
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-
-        catch (error) {
-
-            console.error(error);
-
-            showModal(
-
-                "Ошибка соединения",
-
-                "Не удалось связаться с сервером.\n\n" +
-                "Попробуй ещё раз."
-            );
-
-        }
-
-    }
-
-
-    /* ==================================================
-       МОЯ ПОДПИСКА
-    ================================================== */
-
-    function openSubscription() {
-
-        try {
-
-            tg.HapticFeedback.selectionChanged();
-
-        } catch (e) {}
-
-
-        /*
-         * Telegram Mini App сам не имеет доступа
-         * к данным subscriptions из main.py.
-         *
-         * Поэтому здесь открываем Telegram-бота
-         * и пользователь нажимает "Моя подписка".
-         */
-
-        tg.close();
-
-    }
-
-
-    /* ==================================================
-       УСЛОВИЯ
-    ================================================== */
-
-    function showTerms() {
-
-        showModal(
-
-            "📜 Условия",
-
-            "После успешной оплаты пользователь " +
-            "получает доступ к VPN на выбранный срок.\n\n" +
-
-            "Срок подписки начинается после " +
-            "успешного завершения оплаты.\n\n" +
-
-            "Не передавай данные доступа другим людям.\n\n" +
-
-            "Использование VPN должно соответствовать " +
-            "законодательству твоей страны."
-        );
-
-    }
-
-
-    /* ==================================================
-       ПОДДЕРЖКА
-    ================================================== */
-
-    function showSupport() {
-
-        showModal(
-
-            "🛠 Поддержка",
-
-            "Если возникла проблема с оплатой " +
-            "или VPN-доступом — напиши в поддержку.\n\n" +
-
-            "Укажи:\n" +
-            "• Telegram username или ID\n" +
-            "• купленный тариф\n" +
-            "• описание проблемы\n" +
-            "• информацию об оплате, если она нужна.\n\n" +
-
-            "Если VPN оплачен, но ссылка не пришла — " +
-            "мы проверим оплату и выдадим доступ вручную."
-        );
-
-    }
-
-
-    /* ==================================================
-       MODAL
-    ================================================== */
-
-    function showModal(
-        title,
-        text
-    ) {
-
-        document
-            .getElementById("modalTitle")
-            .textContent = title;
-
-
-        document
-            .getElementById("modalText")
-            .textContent = text;
-
-
-        document
-            .getElementById("modal")
-            .classList.add("show");
-
-    }
-
-
-    function hideModal() {
-
-        document
-            .getElementById("modal")
-            .classList.remove("show");
-
-    }
-
-
-    function closeModal(event) {
-
-        if (
-            event.target.id === "modal"
-        ) {
-
-            hideModal();
-
-        }
+        setTimeout(() => {
+            tg.close();
+        }, 200);
 
     }
 
 </script>
-
 
 </body>
 </html>

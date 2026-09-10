@@ -1,8 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -18,7 +16,6 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
-
         * {
             box-sizing: border-box;
         }
@@ -67,71 +64,16 @@
         .subtitle {
             color: #aaa;
             font-size: 15px;
-            margin-bottom: 25px;
-        }
-
-        .trial {
-
-            width: 100%;
-
-            padding: 18px;
-
-            margin-bottom: 22px;
-
-            border: 2px solid #fff;
-
-            background: #111;
-
-            color: white;
-
-            text-align: left;
-
-            cursor: pointer;
-
-            transform: rotate(.5deg);
-
-            box-shadow:
-                5px 5px 0 #fff;
-
-            transition: .12s;
-        }
-
-        .trial:active {
-
-            transform:
-                translate(4px,4px)
-                rotate(0deg);
-
-            box-shadow: none;
-        }
-
-        .trial-title {
-
-            font-size: 22px;
-
-            font-weight: 900;
-        }
-
-        .trial-text {
-
-            margin-top: 6px;
-
-            color: #aaa;
-
-            font-size: 13px;
+            margin-bottom: 30px;
         }
 
         .tariffs {
-
             display: flex;
-
             flex-direction: column;
-
             gap: 15px;
         }
 
         .tariff {
-
             position: relative;
 
             width: 100%;
@@ -141,7 +83,6 @@
             border: 2px solid #fff;
 
             background: #080808;
-
             color: white;
 
             text-align: left;
@@ -169,69 +110,54 @@
         }
 
         .tariff:active {
-
             transform:
-                translate(4px,4px)
+                translate(4px, 4px)
                 rotate(0deg);
 
             box-shadow: none;
         }
 
         .days {
-
             font-size: 22px;
-
             font-weight: 900;
         }
 
         .price {
-
             margin-top: 5px;
 
             font-size: 31px;
-
             font-weight: 900;
         }
 
         .small {
-
             margin-top: 7px;
 
             color: #888;
-
             font-size: 13px;
         }
 
         .info {
-
             margin-top: 30px;
 
             padding: 18px;
 
             border: 1px solid #333;
 
-            background:
-                rgba(0,0,0,.75);
+            background: rgba(0,0,0,.75);
         }
 
         .info-title {
-
             font-weight: 900;
-
             margin-bottom: 8px;
         }
 
         .info-text {
-
             color: #aaa;
-
             font-size: 14px;
-
             line-height: 1.5;
         }
 
         footer {
-
             margin-top: auto;
 
             padding-top: 40px;
@@ -243,204 +169,541 @@
             font-size: 11px;
         }
 
+
+        /* =========================
+           ЭКРАН ПОДТВЕРЖДЕНИЯ
+        ========================= */
+
+        .screen {
+            display: none;
+            flex-direction: column;
+
+            min-height: 70vh;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .back {
+            width: fit-content;
+
+            border: none;
+            background: transparent;
+
+            color: #888;
+
+            font-size: 15px;
+
+            padding: 0;
+            margin-bottom: 25px;
+
+            cursor: pointer;
+        }
+
+        .confirm-title {
+            font-size: 30px;
+            font-weight: 900;
+
+            margin-bottom: 15px;
+        }
+
+        .confirm-box {
+            border: 2px solid white;
+
+            background: #080808;
+
+            padding: 22px;
+
+            box-shadow: 5px 5px 0 white;
+
+            transform: rotate(-0.5deg);
+        }
+
+        .confirm-tariff {
+            font-size: 24px;
+            font-weight: 900;
+        }
+
+        .confirm-price {
+            margin-top: 8px;
+
+            font-size: 34px;
+            font-weight: 900;
+        }
+
+        .question {
+            margin-top: 18px;
+
+            color: #aaa;
+
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .button {
+            width: 100%;
+
+            margin-top: 18px;
+
+            padding: 17px;
+
+            border: 2px solid white;
+
+            background: white;
+
+            color: black;
+
+            font-size: 17px;
+
+            font-weight: 900;
+
+            cursor: pointer;
+        }
+
+        .button:active {
+            transform: translate(3px, 3px);
+        }
+
+        .button.dark {
+            background: #080808;
+            color: white;
+        }
+
+
+        /* =========================
+           ЭКРАН ОПЛАТЫ
+        ========================= */
+
+        .payment-title {
+            font-size: 30px;
+            font-weight: 900;
+
+            margin-bottom: 20px;
+        }
+
+        .payment-box {
+            border: 2px solid white;
+
+            background: #080808;
+
+            padding: 22px;
+
+            box-shadow: 5px 5px 0 white;
+        }
+
+        .payment-label {
+            color: #888;
+
+            font-size: 13px;
+
+            margin-bottom: 7px;
+        }
+
+        .payment-amount {
+            font-size: 32px;
+
+            font-weight: 900;
+
+            margin-bottom: 25px;
+        }
+
+        .details {
+            padding: 15px;
+
+            border: 1px solid #444;
+
+            background: #111;
+
+            font-size: 20px;
+
+            font-weight: 900;
+
+            word-break: break-all;
+        }
+
+        .warning {
+            margin-top: 20px;
+
+            color: #aaa;
+
+            font-size: 13px;
+
+            line-height: 1.5;
+        }
+
+        .success {
+            text-align: center;
+
+            font-size: 15px;
+
+            color: #aaa;
+
+            margin-top: 15px;
+        }
+
     </style>
-
 </head>
-
 
 <body>
 
 <div class="page">
 
+    <!-- =========================
+         ГЛАВНЫЙ ЭКРАН
+    ========================= -->
 
-    <div class="title">
-        ОтвалиVPN
-    </div>
+    <div id="homeScreen" class="screen active">
 
-
-    <div class="subtitle">
-        VPN без лишнего гемора.
-    </div>
-
-
-    <!-- БЕСПЛАТНАЯ ПРОБА -->
-
-    <button
-        class="trial"
-        onclick="trial()"
-    >
-
-        <div class="trial-title">
-            🎁 3 ДНЯ БЕСПЛАТНО
+        <div class="title">
+            ОтвалиVPN
         </div>
 
-        <div class="trial-text">
-            Попробуй ОтвалиVPN перед покупкой
+        <div class="subtitle">
+            VPN без лишнего гемора.
         </div>
 
-    </button>
+
+        <div class="tariffs">
+
+            <button
+                class="tariff"
+                onclick="selectTariff(7, 60)"
+            >
+                <div class="days">
+                    7 ДНЕЙ
+                </div>
+
+                <div class="price">
+                    60 руб
+                </div>
+
+                <div class="small">
+                    Быстрый тест
+                </div>
+            </button>
 
 
-    <!-- ТАРИФЫ -->
+            <button
+                class="tariff"
+                onclick="selectTariff(14, 100)"
+            >
+                <div class="days">
+                    14 ДНЕЙ
+                </div>
 
-    <div class="tariffs">
+                <div class="price">
+                    100 руб
+                </div>
+
+                <div class="small">
+                    Выгодный вариант
+                </div>
+            </button>
 
 
-        <button
-            class="tariff"
-            onclick="buy(7)"
-        >
+            <button
+                class="tariff"
+                onclick="selectTariff(30, 200)"
+            >
+                <div class="days">
+                    30 ДНЕЙ
+                </div>
 
-            <div class="days">
-                🪦 7 ДНЕЙ
+                <div class="price">
+                    200 руб
+                </div>
+
+                <div class="small">
+                    Оптимальный вариант
+                </div>
+            </button>
+
+
+            <button
+                class="tariff"
+                onclick="selectTariff(90, 399)"
+            >
+                <div class="days">
+                    90 ДНЕЙ
+                </div>
+
+                <div class="price">
+                    399 руб
+                </div>
+
+                <div class="small">
+                    Максимальный срок
+                </div>
+            </button>
+
+        </div>
+
+
+        <div class="info">
+
+            <div class="info-title">
+                Как купить
             </div>
 
-            <div class="price">
+            <div class="info-text">
+                Выбери тариф → подтверди покупку →
+                получи реквизиты → переведи нужную сумму →
+                нажми «Я оплатил».
+            </div>
+
+        </div>
+
+
+        <footer>
+            created by lobotomiya or hackentik
+        </footer>
+
+    </div>
+
+
+    <!-- =========================
+         ПОДТВЕРЖДЕНИЕ
+    ========================= -->
+
+    <div id="confirmScreen" class="screen">
+
+        <button
+            class="back"
+            onclick="goHome()"
+        >
+            ← Назад
+        </button>
+
+        <div class="confirm-title">
+            Подтверждение
+        </div>
+
+        <div class="confirm-box">
+
+            <div
+                id="confirmTariff"
+                class="confirm-tariff"
+            >
+                7 ДНЕЙ
+            </div>
+
+            <div
+                id="confirmPrice"
+                class="confirm-price"
+            >
                 60 руб
             </div>
 
-            <div class="small">
-                Быстрый тест
+            <div class="question">
+                Ты действительно хочешь купить
+                этот тариф?
             </div>
 
+        </div>
+
+
+        <button
+            class="button"
+            onclick="showPayment()"
+        >
+            Да, купить
         </button>
 
 
         <button
-            class="tariff"
-            onclick="buy(14)"
+            class="button dark"
+            onclick="goHome()"
         >
-
-            <div class="days">
-                📜 14 ДНЕЙ
-            </div>
-
-            <div class="price">
-                100 руб
-            </div>
-
-            <div class="small">
-                Выгодный вариант
-            </div>
-
+            Нет, назад
         </button>
-
-
-        <button
-            class="tariff"
-            onclick="buy(30)"
-        >
-
-            <div class="days">
-                📜 30 ДНЕЙ
-            </div>
-
-            <div class="price">
-                200 руб
-            </div>
-
-            <div class="small">
-                Оптимальный вариант
-            </div>
-
-        </button>
-
-
-        <button
-            class="tariff"
-            onclick="buy(90)"
-        >
-
-            <div class="days">
-                🕊️ 90 ДНЕЙ
-            </div>
-
-            <div class="price">
-                399 руб
-            </div>
-
-            <div class="small">
-                Максимальный срок
-            </div>
-
-        </button>
-
 
     </div>
 
 
-    <div class="info">
+    <!-- =========================
+         ОПЛАТА
+    ========================= -->
 
-        <div class="info-title">
-            ⚔️ Как купить
+    <div id="paymentScreen" class="screen">
+
+        <button
+            class="back"
+            onclick="goConfirm()"
+        >
+            ← Назад
+        </button>
+
+        <div class="payment-title">
+            Оплата
         </div>
 
-        <div class="info-text">
 
-            Выбери срок → подтверди покупку →
-            получи реквизиты → переведи нужную сумму →
-            нажми «Я оплатил» → после проверки получишь VPN.
+        <div class="payment-box">
 
-            <br><br>
+            <div class="payment-label">
+                Тариф
+            </div>
 
-            🎁 Можно сначала попробовать VPN бесплатно
-            в течение 3 дней.
+            <div
+                id="paymentTariff"
+                class="confirm-tariff"
+            >
+                7 ДНЕЙ
+            </div>
 
+
+            <div
+                id="paymentPrice"
+                class="payment-amount"
+            >
+                60 руб
+            </div>
+
+
+            <div class="payment-label">
+                Реквизиты для перевода
+            </div>
+
+            <div class="details">
+                79326226323
+            </div>
+
+
+            <div class="warning">
+                Переведи ровно указанную сумму
+                и после перевода нажми кнопку
+                «Я оплатил».
+            </div>
+
+        </div>
+
+
+        <button
+            class="button"
+            onclick="paid()"
+        >
+            Я оплатил
+        </button>
+
+
+        <div class="success">
+            После нажатия заявка уйдёт боту
+            на проверку оплаты.
         </div>
 
     </div>
-
-
-    <footer>
-        created by lobotomiya or hackentik
-    </footer>
-
 
 </div>
 
 
 <script>
 
-    const tg =
-        window.Telegram.WebApp;
+    const tg = window.Telegram.WebApp;
 
     tg.ready();
-
     tg.expand();
 
 
-    function buy(days) {
+    let selectedDays = 0;
+    let selectedPrice = 0;
+
+
+    // =========================
+    // ВЫБОР ТАРИФА
+    // =========================
+
+    function selectTariff(days, price) {
+
+        selectedDays = days;
+        selectedPrice = price;
+
+        document.getElementById("confirmTariff")
+            .innerText = days + " ДНЕЙ";
+
+        document.getElementById("confirmPrice")
+            .innerText = price + " руб";
+
+        document.getElementById("homeScreen")
+            .classList.remove("active");
+
+        document.getElementById("confirmScreen")
+            .classList.add("active");
+
+    }
+
+
+    // =========================
+    // ОПЛАТА
+    // =========================
+
+    function showPayment() {
+
+        document.getElementById("paymentTariff")
+            .innerText = selectedDays + " ДНЕЙ";
+
+        document.getElementById("paymentPrice")
+            .innerText = selectedPrice + " руб";
+
+        document.getElementById("confirmScreen")
+            .classList.remove("active");
+
+        document.getElementById("paymentScreen")
+            .classList.add("active");
+
+    }
+
+
+    // =========================
+    // Я ОПЛАТИЛ
+    // =========================
+
+    function paid() {
+
+        if (!selectedDays) {
+            return;
+        }
 
         tg.sendData(
-            "buy:" + days
+            "buy:" + selectedDays
         );
 
         setTimeout(() => {
-
             tg.close();
-
         }, 200);
 
     }
 
 
-    function trial() {
+    // =========================
+    // НАЗАД
+    // =========================
 
-        tg.sendData(
-            "trial"
-        );
+    function goHome() {
 
-        setTimeout(() => {
+        document.getElementById("confirmScreen")
+            .classList.remove("active");
 
-            tg.close();
+        document.getElementById("paymentScreen")
+            .classList.remove("active");
 
-        }, 200);
+        document.getElementById("homeScreen")
+            .classList.add("active");
+
+    }
+
+
+    function goConfirm() {
+
+        document.getElementById("paymentScreen")
+            .classList.remove("active");
+
+        document.getElementById("confirmScreen")
+            .classList.add("active");
 
     }
 
 </script>
 
-
 </body>
-
-         </html>
+</html>

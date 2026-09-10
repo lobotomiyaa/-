@@ -47,26 +47,25 @@ TARIFFS = {
     "30": {
         "days": 30,
         "price": 129,
-        "name": "❄ 30 дней",
+        "name": "🪦 30 дней",
     },
 
     "90": {
         "days": 90,
         "price": 399,
-        "name": "🧶 90 дней",
+        "name": "📜 90 дней",
     },
 }
 
 
 # ============================================================
 # ВРЕМЕННОЕ ХРАНИЛИЩЕ
-#
-# Реальный срок VPN хранится в 3X-UI.
-# Здесь бот временно хранит информацию для интерфейса.
 # ============================================================
 
 subscriptions = {}
+
 vpn_links = {}
+
 subscription_tariffs = {}
 
 admin_states = {}
@@ -84,7 +83,7 @@ def main_keyboard():
 
             [
                 InlineKeyboardButton(
-                    text="❄ Открыть ОтвалиVPN",
+                    text="🪡 Открыть ОтвалиVPN",
                     web_app=WebAppInfo(
                         url=WEBAPP_URL
                     )
@@ -93,40 +92,40 @@ def main_keyboard():
 
             [
                 InlineKeyboardButton(
-                    text="🪡 7 дней — 59 ⭐",
+                    text="🪦 7 дней — 59 ⭐",
                     callback_data="buy_7"
                 )
             ],
 
             [
                 InlineKeyboardButton(
-                    text="❄ 30 дней — 129 ⭐",
+                    text="📜 30 дней — 129 ⭐",
                     callback_data="buy_30"
                 )
             ],
 
             [
                 InlineKeyboardButton(
-                    text="🧶 90 дней — 399 ⭐",
+                    text="🕊️ 90 дней — 399 ⭐",
                     callback_data="buy_90"
                 )
             ],
 
             [
                 InlineKeyboardButton(
-                    text="🪦 Моя подписка",
+                    text="💷 Моя подписка",
                     callback_data="subscription"
                 )
             ],
 
             [
                 InlineKeyboardButton(
-                    text="📜 Условия",
+                    text="⚔️ Условия",
                     callback_data="terms"
                 ),
 
                 InlineKeyboardButton(
-                    text="🛠 Поддержка",
+                    text="🪡 Поддержка",
                     callback_data="support"
                 )
             ]
@@ -143,7 +142,7 @@ def back_keyboard():
 
             [
                 InlineKeyboardButton(
-                    text="❄ Главное меню",
+                    text="🪡 Главное меню",
                     callback_data="main_menu"
                 )
             ]
@@ -160,7 +159,7 @@ def subscription_keyboard():
 
             [
                 InlineKeyboardButton(
-                    text="❄ Купить / продлить VPN",
+                    text="🪡 Купить / продлить VPN",
                     web_app=WebAppInfo(
                         url=WEBAPP_URL
                     )
@@ -169,7 +168,7 @@ def subscription_keyboard():
 
             [
                 InlineKeyboardButton(
-                    text="❄ Главное меню",
+                    text="🪡 Главное меню",
                     callback_data="main_menu"
                 )
             ]
@@ -447,9 +446,9 @@ async def handle_message(message: types.Message):
 
             "👋 <b>Добро пожаловать в ОтвалиVPN!</b>\n\n"
 
-            "❄ Быстрый и простой VPN\n"
-            "🗡 Защищённое соединение\n"
-            "🧶 Простое подключение\n"
+            "🪡 Быстрый и простой VPN\n"
+            "⚔️ Защищённое соединение\n"
+            "📜 Простое подключение\n"
             "🪦 Без лишних сложностей\n\n"
 
             "Выбери тариф или открой приложение:",
@@ -688,7 +687,7 @@ async def handle_message(message: types.Message):
                             "4. Обнови подписку.\n"
                             "5. Подключись.\n\n"
 
-                            "🗡 <b>Не передавай эту ссылку "
+                            "⚔️ <b>Не передавай ссылку "
                             "другим людям.</b>"
 
                         ),
@@ -740,9 +739,10 @@ async def callbacks(
 
             "🪦 <b>ОтвалиVPN</b>\n\n"
 
-            "❄ Быстрый и простой VPN\n"
-            "🗡 Защищённое соединение\n"
-            "🧶 Простое подключение\n\n"
+            "🪡 Быстрый и простой VPN\n"
+            "⚔️ Защищённое соединение\n"
+            "📜 Простое подключение\n"
+            "🪦 Без лишних сложностей\n\n"
 
             "Выбери действие:",
 
@@ -915,8 +915,12 @@ async def callbacks(
 
             days_left = max(
                 1,
-                (remaining.total_seconds() + 86399)
-                // 86400
+                int(
+                    (
+                        remaining.total_seconds()
+                        + 86399
+                    ) // 86400
+                )
             )
 
             tariff_name = (
@@ -928,7 +932,7 @@ async def callbacks(
 
             text = (
 
-                "🪦 <b>Моя подписка</b>\n\n"
+                "💷 <b>Моя подписка</b>\n\n"
 
                 "🟢 <b>Статус:</b> активна\n"
 
@@ -954,7 +958,7 @@ async def callbacks(
                     "📱 Скопируй ссылку и добавь "
                     "её в Happ.\n\n"
 
-                    "🗡 Не передавай ссылку другим."
+                    "⚔️ Не передавай ссылку другим."
                 )
 
             else:
@@ -983,7 +987,7 @@ async def callbacks(
 
             await callback.message.answer(
 
-                "🪦 <b>Моя подписка</b>\n\n"
+                "💷 <b>Моя подписка</b>\n\n"
 
                 "🔴 <b>Активной подписки нет.</b>\n\n"
 
@@ -1009,7 +1013,7 @@ async def callbacks(
 
         await callback.message.answer(
 
-            "📜 <b>Условия использования "
+            "⚔️ <b>Условия использования "
             "ОтвалиVPN</b>\n\n"
 
             "После успешной оплаты пользователь "
@@ -1018,7 +1022,7 @@ async def callbacks(
             "⏱ Срок подписки начинается после "
             "успешного завершения оплаты.\n\n"
 
-            "🗡 Данные доступа нельзя передавать "
+            "🪡 Данные доступа нельзя передавать "
             "другим людям.\n\n"
 
             "⚖️ Использование VPN должно соответствовать "
@@ -1046,7 +1050,7 @@ async def callbacks(
 
         await callback.message.answer(
 
-            "🛠 <b>Поддержка ОтвалиVPN</b>\n\n"
+            "🪡 <b>Поддержка ОтвалиVPN</b>\n\n"
 
             "Возникла проблема? Не переживай.\n\n"
 
@@ -1186,7 +1190,7 @@ async def terms_command(
 
     await message.answer(
 
-        "📜 <b>Условия использования "
+        "⚔️ <b>Условия использования "
         "ОтвалиVPN</b>\n\n"
 
         "После успешной оплаты пользователь "
@@ -1195,7 +1199,7 @@ async def terms_command(
         "⏱ Срок подписки начинается после "
         "успешного завершения оплаты.\n\n"
 
-        "🗡 Данные доступа нельзя передавать "
+        "🪡 Данные доступа нельзя передавать "
         "другим людям.\n\n"
 
         "⚖️ Использование VPN должно соответствовать "
@@ -1224,7 +1228,7 @@ async def paysupport_command(
 
     await message.answer(
 
-        "🛠 <b>Поддержка ОтвалиVPN</b>\n\n"
+        "🪡 <b>Поддержка ОтвалиVPN</b>\n\n"
 
         "Возникла проблема с оплатой, "
         "подпиской или VPN?\n\n"
@@ -1259,17 +1263,17 @@ async def setup_bot():
 
             BotCommand(
                 command="start",
-                description="❄ Запустить ОтвалиVPN"
+                description="🪡 Запустить ОтвалиVPN"
             ),
 
             BotCommand(
                 command="terms",
-                description="📜 Условия использования"
+                description="⚔️ Условия использования"
             ),
 
             BotCommand(
                 command="paysupport",
-                description="🛠 Поддержка по оплате"
+                description="🪡 Поддержка по оплате"
             )
         ]
     )
@@ -1279,7 +1283,7 @@ async def setup_bot():
 
         menu_button=MenuButtonWebApp(
 
-            text="❄ ОтвалиVPN",
+            text="🪡 ОтвалиVPN",
 
             web_app=WebAppInfo(
                 url=WEBAPP_URL

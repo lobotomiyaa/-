@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 
 <head>
@@ -25,68 +25,100 @@
 
         html,
         body {
-
             margin: 0;
             padding: 0;
-
             width: 100%;
             min-height: 100%;
-
             font-family: Arial, sans-serif;
-
             background: #050505;
             color: white;
         }
 
         body {
-
             min-height: 100vh;
 
             background:
-
                 linear-gradient(
                     rgba(0,0,0,.78),
                     rgba(0,0,0,.90)
                 ),
-
                 url("background.png");
 
             background-size: cover;
-
             background-position: center;
-
             background-attachment: fixed;
         }
 
         .page {
-
             min-height: 100vh;
-
             padding: 30px 18px 20px;
 
             display: flex;
-
             flex-direction: column;
         }
 
         .title {
-
             font-size: 42px;
-
             font-weight: 900;
-
             letter-spacing: -2px;
-
             margin-bottom: 4px;
         }
 
         .subtitle {
+            color: #aaa;
+            font-size: 15px;
+            margin-bottom: 25px;
+        }
+
+        .trial {
+
+            width: 100%;
+
+            padding: 18px;
+
+            margin-bottom: 22px;
+
+            border: 2px solid #fff;
+
+            background: #111;
+
+            color: white;
+
+            text-align: left;
+
+            cursor: pointer;
+
+            transform: rotate(.5deg);
+
+            box-shadow:
+                5px 5px 0 #fff;
+
+            transition: .12s;
+        }
+
+        .trial:active {
+
+            transform:
+                translate(4px,4px)
+                rotate(0deg);
+
+            box-shadow: none;
+        }
+
+        .trial-title {
+
+            font-size: 22px;
+
+            font-weight: 900;
+        }
+
+        .trial-text {
+
+            margin-top: 6px;
 
             color: #aaa;
 
-            font-size: 15px;
-
-            margin-bottom: 30px;
+            font-size: 13px;
         }
 
         .tariffs {
@@ -125,27 +157,21 @@
         }
 
         .tariff:nth-child(2) {
-
-            transform:
-                rotate(.6deg);
+            transform: rotate(.6deg);
         }
 
         .tariff:nth-child(3) {
-
-            transform:
-                rotate(-.4deg);
+            transform: rotate(-.4deg);
         }
 
         .tariff:nth-child(4) {
-
-            transform:
-                rotate(.5deg);
+            transform: rotate(.5deg);
         }
 
         .tariff:active {
 
             transform:
-                translate(4px, 4px)
+                translate(4px,4px)
                 rotate(0deg);
 
             box-shadow: none;
@@ -226,14 +252,36 @@
 
 <div class="page">
 
+
     <div class="title">
         ОтвалиVPN
     </div>
+
 
     <div class="subtitle">
         VPN без лишнего гемора.
     </div>
 
+
+    <!-- БЕСПЛАТНАЯ ПРОБА -->
+
+    <button
+        class="trial"
+        onclick="trial()"
+    >
+
+        <div class="trial-title">
+            🎁 3 ДНЯ БЕСПЛАТНО
+        </div>
+
+        <div class="trial-text">
+            Попробуй ОтвалиVPN перед покупкой
+        </div>
+
+    </button>
+
+
+    <!-- ТАРИФЫ -->
 
     <div class="tariffs">
 
@@ -329,9 +377,14 @@
 
         <div class="info-text">
 
-            Выбери срок → получи реквизиты →
-            переведи нужную сумму → нажми
-            «Я оплатил» → после проверки получишь VPN.
+            Выбери срок → подтверди покупку →
+            получи реквизиты → переведи нужную сумму →
+            нажми «Я оплатил» → после проверки получишь VPN.
+
+            <br><br>
+
+            🎁 Можно сначала попробовать VPN бесплатно
+            в течение 3 дней.
 
         </div>
 
@@ -370,9 +423,24 @@
 
     }
 
+
+    function trial() {
+
+        tg.sendData(
+            "trial"
+        );
+
+        setTimeout(() => {
+
+            tg.close();
+
+        }, 200);
+
+    }
+
 </script>
 
 
 </body>
 
-</html>
+         </html>

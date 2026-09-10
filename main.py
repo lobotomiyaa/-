@@ -2,25 +2,49 @@ import asyncio
 import os
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    WebAppInfo
+)
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+
+WEBAPP_URL = "https://sweet-rejoicing-production.up.railway.app/app"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
 
+@app.get("/")
+async def home():
+    return {
+        "status": "ok",
+        "service": "OtvaliVPN"
+    }
+
+
+@app.get("/app", response_class=HTMLResponse)
+async def webapp():
+    with open("webapp.html", "r", encoding="utf-8") as file:
+        return file.read()
+
+
 @dp.message()
 async def handle_message(message: types.Message):
+
     if message.text == "/start":
+
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="❄ Купить ОтвалиVPN",
-                        callback_data="buy"
+                        text="❄ Открыть ОтвалиVPN",
+                        web_app=WebAppInfo(url=WEBAPP_URL)
                     )
                 ],
                 [
@@ -38,7 +62,7 @@ async def handle_message(message: types.Message):
             "🗡 Защищённое соединение\n"
             "🧶 Удобное подключение\n"
             "🪦 Без лишних сложностей\n\n"
-            "Выбери действие ниже:",
+            "Открой приложение ниже:",
             reply_markup=keyboard,
             parse_mode="HTML"
         )
@@ -46,16 +70,8 @@ async def handle_message(message: types.Message):
 
 @dp.callback_query()
 async def callbacks(callback: types.CallbackQuery):
-    if callback.data == "buy":
-        await callback.message.answer(
-            "❄ <b>Тарифы ОтвалиVPN</b>\n\n"
-            "🪡 7 дней — 99 ⭐\n"
-            "🧶 30 дней — 299 ⭐\n"
-            "🗡 90 дней — 699 ⭐",
-            parse_mode="HTML"
-        )
 
-    elif callback.data == "subscription":
+    if callback.data == "subscription":
         await callback.message.answer(
             "🪦 <b>Моя подписка</b>\n\n"
             "У тебя пока нет активной подписки.",
@@ -63,14 +79,6 @@ async def callbacks(callback: types.CallbackQuery):
         )
 
     await callback.answer()
-
-
-@app.get("/")
-async def home():
-    return {
-        "status": "ok",
-        "service": "OtvaliVPN"
-    }
 
 
 async def start_bot():
